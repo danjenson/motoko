@@ -1,0 +1,56 @@
+{
+  "hasTarget": true,
+  "targetName": "species",
+  "attributes": [
+    {
+      "name": "petal_length",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "petal_width",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "sepal_length",
+      "dataType": "FLOAT",
+      "replacements": [
+        {
+          "from": {
+            "datum": {
+              "type": "FLOAT",
+              "FLOAT": 5.0
+            }
+          },
+          "to": {
+            "datum": {
+              "type": "FLOAT",
+              "FLOAT": 7.0
+            }
+          }
+        },
+        {
+          "from": {
+            "missing": true
+          },
+          "to": {
+            "function": "MEAN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sepal_width",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "species",
+      "behaviorType": "CATEGORICAL",
+      "dataType": "STRING"
+    },
+    {
+      "name": "news",
+      "behaviorType": "TEXT",
+      "dataType": "STRING"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+package pb;
+
+import "types.proto";
+
+
+service Tachikoma {
+  rpc Infer (stream InferRequest) returns (InferResponse);
+  rpc Learn (stream LearnRequest) returns (LearnResponse);
+  rpc Predict (stream PredictRequest) returns (stream PredictResponse);
+}

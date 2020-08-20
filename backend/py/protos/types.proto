@@ -1,0 +1,99 @@
+syntax = "proto3";
+package pb;
+
+import "enums.proto";
+
+
+message Attribute {
+  string name = 1;
+  BehaviorType behavior_type = 2;
+  DataType data_type = 3;
+  repeated Replacement replacements = 4;
+}
+
+
+message InferRequest {
+  message Parameters {
+    float numeric_error_threshold = 1;
+    int32 n_max_categories = 2;
+  }
+  oneof value {
+    Parameters parameters = 1;
+    bytes data = 2;
+  }
+}
+
+
+message InferResponse {
+  Metadata metadata = 1;
+}
+
+
+message LearnRequest {
+  oneof value {
+    Metadata metadata = 1;
+    bytes data = 2;
+  }
+}
+
+
+message LearnResponse {
+  string learn_key = 1;
+  string evaluation = 2;
+  string decisions = 3;
+}
+
+
+message Metadata {
+  bool has_target = 1;
+  string target_name = 2;
+  // list instead of Map because maps do not allow repeated fields
+  // and attributes have repeated Replacements
+  repeated Attribute attributes = 3;
+}
+
+
+message PredictRequest {
+  oneof value {
+    string learn_key = 1;
+    bytes data = 2;
+  }
+}
+
+
+message PredictResponse {
+  oneof value {
+    string predictions = 1;
+    string decisions = 2;
+  }
+}
+
+
+message Replacement {
+  message From {
+    oneof value {
+      bool missing = 1;
+      TypedDatum datum = 2;
+    }
+  }
+  message To {
+    oneof value {
+      FunctionType function = 3;
+      TypedDatum datum = 4;
+    }
+  }
+  From from = 1;
+  To to = 2;
+}
+
+
+message TypedDatum {
+  DataType type = 1;
+  // NOTE: caps here to match DataType names
+  oneof value {
+    bool BOOLEAN = 2;
+    double FLOAT = 3;
+    int64 INTEGER = 4;
+    string STRING = 5;
+  }
+}

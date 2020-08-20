@@ -1,0 +1,45 @@
+syntax = "proto3";
+package pb;
+
+
+enum BehaviorType {
+  CONTINUOUS = 0;
+  CATEGORICAL = 1;
+  TEXT = 2;
+}
+
+
+enum DataType {
+  BOOLEAN = 0;
+  FLOAT = 1;
+  INTEGER = 2;
+  STRING = 3;
+}
+
+
+enum FunctionType {
+  MEAN = 0;
+  MEDIAN = 1;
+  MODE = 2;
+}
+
+
+enum KeyType {
+  LEARN = 0;
+  TRANSFORMER = 1;
+  ESTIMATOR = 2;
+  EVALUATION = 3;
+}
+
+
+enum ServiceType {
+  SERVICE_LEARN = 0;
+  SERVICE_PREDICT = 1;
+}
+
+
+enum TaskType {
+  CLASSIFY = 0;
+  REGRESS = 1;
+  CLUSTER = 2;
+}

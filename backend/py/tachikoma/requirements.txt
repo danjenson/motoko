@@ -1,0 +1,11 @@
+# (2019-11-27) must install from source to enable grpc.so_reuseport
+grpcio --no-binary grpcio
+grpcio-tools
+mysql-connector-python
+nose
+numpy
+pandas
+protobuf
+pymongo
+scipy
+sklearn

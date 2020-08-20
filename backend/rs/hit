@@ -1,0 +1,13 @@
+#!/bin/bash
+if [ "$1" == "-h" ]; then
+    printf '\nusage: ./hit <json_payload> (prod)\n\n' 
+    exit 1
+fi
+TIER=${1:-dev}
+PAYLOAD=${2:-'{"firstName": "motoko"}'}
+ENDPOINT=https://dev.motoko.ai/graphql
+if [ "$TIER" == "prod" ]; then
+  ENDPOINT=https://motoko.ai/graphql
+fi
+echo curl -g -X POST --header "'"Content-Type: application/json"'" --data "'"$PAYLOAD"'" $ENDPOINT
+curl -g -X POST --header 'Content-Type: application/json' --data "$PAYLOAD" $ENDPOINT

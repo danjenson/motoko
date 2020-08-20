@@ -1,0 +1,14 @@
+syntax = "proto3";
+package pb;
+
+import "types.proto";
+
+service Motoko {
+  rpc Infer (stream InferRequest) returns (InferResponse);
+  rpc Learn (stream LearnRequest) returns (LearnResponse);
+  rpc Predict (stream PredictRequest) returns (stream PredictResponse);
+  // TODO(danj): remove this once client-stream -> unary response is fixed
+  // https://github.com/improbable-eng/grpc-web/issues/551 
+  rpc WebInfer (stream InferRequest) returns (stream InferResponse);
+  rpc WebLearn (stream LearnRequest) returns (stream LearnResponse);
+}

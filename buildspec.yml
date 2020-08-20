@@ -1,0 +1,13 @@
+version: 0.1
+environment_variables:
+  git-credential-helper: true
+phases:
+  build:
+    commands:
+      - cd backend/rs && ./deploy graphql prod
+      - cd frontend && ./run build web
+  post_build:
+    commands:
+      - bash -c 'if [ "$CODEBUILD_BUILD_SUCCEEDING" == "0" ]; then exit 1; fi'
+      - aws s3 rm s3://${S3_BUCKET} --recursive
+      - aws s3 cp frontend/build/web s3://${S3_BUCKET} --recursive
