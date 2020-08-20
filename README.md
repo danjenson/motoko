@@ -15,6 +15,9 @@
 - motoko pypi sdk
 
 ## Deployment
+- run `cargo build`
+- build environment is specified by a [Dockerfile] and is pushed to AWS ECR
+- push deploy/
 - motoko.ai:
   - CodeBuild runs
     [buildspec-prod.yml](https://github.com/danjenson/motoko/blob/master/buildspec-prod.yml)
