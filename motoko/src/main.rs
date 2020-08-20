@@ -6,22 +6,13 @@ use std::fs;
 use std::process::{exit, Command, Stdio};
 use which::which;
 
+// TODO: danj BRANCH???
+
 fn main() {
-    ensure_has("git");
-    if !String::from_utf8(
-        Command::new("git")
-            .arg("config")
-            .arg("--get")
-            .arg("remote.origin.url")
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap()
-    .trim()
-    .ends_with("motoko.git")
+    if !run_from(".", "git", &["config", "--get", "remote.origin.url"])
+        .ends_with("motoko.git")
     {
-        quit("must be run from the 'motoko' git repository!")
+        quit("must be run from the 'motoko' git repository!");
     }
     let args = App::new(crate_name!())
         .version(crate_version!())
@@ -38,6 +29,23 @@ fn main() {
         ("test", args) => test(args.expect("missing test arguments!")),
         _ => quit("invalid subcommand!"),
     }
+}
+
+fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
+    ensure_has(cmd);
+    return String::from_utf8(
+        Command::new(cmd)
+            .args(args)
+            .current_dir(from)
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .into();
 }
 
 fn ensure_has(binary: &str) {
@@ -90,23 +98,23 @@ fn test_subcommand<'a>() -> App<'a, 'a> {
         );
 }
 
-fn run_from(from: &str, cmd: &str, args: &[&str]) {
-    ensure_has(cmd);
-    Command::new(cmd)
-        .args(args)
-        .current_dir(from)
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .output()
-        .unwrap();
-}
-
 fn build(args: &ArgMatches<'_>) {
+    ensure_on_clean_dev_or_prod_branch();
     match args.subcommand() {
         ("build-image", _) => build_build_image(),
         ("frontend", Some(args)) => build_frontend(args),
         ("backend", Some(args)) => build_backend(args),
         _ => quit("invalid build target!"),
+    }
+}
+
+fn ensure_on_clean_dev_or_prod_branch() {
+    if !["dev".to_owned(), "prod".to_owned()].contains(&run_from(
+        ".",
+        "git",
+        &["branch", "--show-current"],
+    )) {
+        quit("command can only be run from the 'dev' or 'prod' branches");
     }
 }
 
@@ -174,10 +182,11 @@ fn build_backend_function(name: &str) {
 }
 
 fn build_all_backend_functions() {
-    run_from("backend", "cargo", &["build", "--bins"]);
+    run_from("backend/rs", "cargo", &["build", "--bins"]);
 }
 
 fn deploy(args: &ArgMatches<'_>) {
+    ensure_on_clean_dev_or_prod_branch();
     match args.subcommand() {
         ("build-image", _) => deploy_build_image(),
         ("frontend", Some(args)) => deploy_frontend(args),
@@ -187,7 +196,26 @@ fn deploy(args: &ArgMatches<'_>) {
 }
 
 fn deploy_build_image() {
-    // TODO
+    let credentials =
+        run_from(".", "aws", &["get-login-password", "--region", "us-west-1"]);
+    run_from(
+        ".",
+        "docker",
+        &[
+            "tag",
+            "motoko:latest",
+            "902096072945.dkr.ecr.us-west-1.amazonaws.com/motoko:latest",
+            &credentials,
+        ],
+    );
+    run_from(
+        ".",
+        "docker",
+        &[
+            "push",
+            "902096072945.dkr.ecr.us-west-1.amazonaws.com/motoko:latest",
+        ],
+    );
 }
 
 fn deploy_frontend(args: &ArgMatches<'_>) {
@@ -203,6 +231,9 @@ fn deploy_frontend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_frontend_android() {
+    //
+    // - aws s3 rm s3://${S3_BUCKET} --recursive
+    // - aws s3 cp frontend/build/web s3://${S3_BUCKET} --recursive
     // TODO
 }
 
