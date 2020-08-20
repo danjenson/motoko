@@ -1,6 +1,6 @@
 # motoko
-- "I'll have my AI analyze the data."
-- test
+![motoko motorcycle](https://i.pinimg.com/originals/56/55/bb/5655bbf38aedf1ff44e926c190859c7b.png)
+> I'll have my AI analyze the data.
 
 ## TODO
 - docker image for CloudBuild
