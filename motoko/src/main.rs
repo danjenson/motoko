@@ -220,9 +220,7 @@ fn current_branch() -> String {
 }
 
 fn ensure_clean() {
-    let x = run_from(".", "git", &["status", "--porcelain"]);
-    eprintln!("'{}': {}", x, x.is_empty());
-    if !run_from(".", "git", &["--porcelain"]).is_empty() {
+    if !run_from(".", "git", &["status", "--porcelain"]).is_empty() {
         quit("branch is not clean");
     }
 }
