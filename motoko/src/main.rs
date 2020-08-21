@@ -2,7 +2,6 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, App,
     AppSettings, Arg, ArgMatches, SubCommand,
 };
-use std::fs;
 use std::process::{exit, Command, ExitStatus};
 use which::which;
 
@@ -221,7 +220,7 @@ fn current_branch() -> String {
 }
 
 fn ensure_clean() {
-    let x = run_from(".", "git", &["--porcelain"]);
+    let x = run_from(".", "git", &["status", "--porcelain"]);
     eprintln!("'{}': {}", x, x.is_empty());
     if !run_from(".", "git", &["--porcelain"]).is_empty() {
         quit("branch is not clean");
