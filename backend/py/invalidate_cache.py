@@ -1,6 +1,5 @@
 import boto3
 import time
-import json
 
 
 def lambda_handler(event, context):
