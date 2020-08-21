@@ -402,6 +402,7 @@ fn deploy_frontend_android() {
             &format!("{}/install", s3_bucket),
         ],
     );
+    invalidate_cache();
 }
 
 fn deploy_frontend_ios() {
