@@ -80,7 +80,7 @@ fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
     }
     let output = res.unwrap();
     if !output.status.success() {
-        quit("failed");
+        quit(&String::from_utf8(output.stderr).unwrap());
     }
     return String::from_utf8(output.stdout).unwrap().trim().into();
 }
@@ -251,7 +251,7 @@ fn build_frontend_android() {
             "appbundle",
             "--release",
             "--target-platform",
-            "android-arm,android-arm64,android-x86",
+            "android-arm,android-arm64,android_x86",
         ],
     );
     run_from(
