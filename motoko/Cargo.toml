@@ -10,3 +10,4 @@ description = "commands for orchestrating the motoko project"
 [dependencies]
 clap = "2.33.1"
 which = "4.0.1"
+reqwest = { version = "0.10.7", features = ["blocking"] }

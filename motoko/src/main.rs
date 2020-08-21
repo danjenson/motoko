@@ -6,29 +6,70 @@ use std::fs;
 use std::process::{exit, Command, Stdio};
 use which::which;
 
-// TODO: danj BRANCH???
-
 fn main() {
-    if !run_from(".", "git", &["config", "--get", "remote.origin.url"])
-        .ends_with("motoko.git")
-    {
-        quit("must be run from the 'motoko' git repository!");
-    }
+    ensure_in_repo("motoko");
     let args = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
         .setting(AppSettings::ArgRequiredElseHelp)
+        .subcommand(
+            SubCommand::with_name("install")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .subcommand(SubCommand::with_name("aws"))
+                .subcommand(SubCommand::with_name("android")),
+        )
+        .subcommand(
+            SubCommand::with_name("test")
+                .setting(AppSettings::ArgRequiredElseHelp)
+                .subcommand(
+                    SubCommand::with_name("gql")
+                        .setting(AppSettings::ArgRequiredElseHelp)
+                        .subcommand(
+                            SubCommand::with_name("dev")
+                                .setting(AppSettings::ArgRequiredElseHelp)
+                                .arg(
+                                    Arg::with_name("json_payload")
+                                        .required(true),
+                                ),
+                        )
+                        .subcommand(
+                            SubCommand::with_name("prod")
+                                .setting(AppSettings::ArgRequiredElseHelp)
+                                .arg(
+                                    Arg::with_name("json_payload")
+                                        .required(true),
+                                ),
+                        ),
+                ),
+        )
         .subcommand(devops_subcommand("build"))
         .subcommand(devops_subcommand("deploy"))
-        .subcommand(test_subcommand())
         .get_matches();
     match args.subcommand() {
+        ("test", args) => test(args.expect("missing test arguments!")),
+        ("install", args) => install(args.expect("missing install arguments!")),
         ("build", args) => build(args.expect("missing a build target!")),
         ("deploy", args) => deploy(args.expect("missing deploy target!")),
-        ("test", args) => test(args.expect("missing test arguments!")),
         _ => quit("invalid subcommand!"),
     }
+}
+
+fn ensure_in_repo(name: &str) {
+    if current_repo() != name {
+        quit(&format!("must be run from the '{}' git repository", name));
+    }
+}
+
+fn current_repo() -> String {
+    return run_from(".", "git", &["config", "--get", "remote.origin.url"])
+        .rsplit("/")
+        .next()
+        .unwrap()
+        .split(".")
+        .next()
+        .unwrap()
+        .into();
 }
 
 fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
@@ -79,27 +120,84 @@ fn devops_subcommand(name: &str) -> App {
         );
 }
 
-fn test_subcommand<'a>() -> App<'a, 'a> {
-    return SubCommand::with_name("test")
-        .setting(AppSettings::ArgRequiredElseHelp)
-        .subcommand(
-            SubCommand::with_name("gql")
-                .setting(AppSettings::ArgRequiredElseHelp)
-                .subcommand(
-                    SubCommand::with_name("dev")
-                        .setting(AppSettings::ArgRequiredElseHelp)
-                        .arg(Arg::with_name("json_payload").required(true)),
-                )
-                .subcommand(
-                    SubCommand::with_name("prod")
-                        .setting(AppSettings::ArgRequiredElseHelp)
-                        .arg(Arg::with_name("json_payload").required(true)),
-                ),
-        );
+fn test(args: &ArgMatches<'_>) {
+    match args.subcommand() {
+        ("gql", Some(args)) => test_gql(args),
+        _ => quit("invalid test target!"),
+    }
+}
+
+fn test_gql(args: &ArgMatches<'_>) {
+    match args.subcommand() {
+        ("dev", Some(args)) => gql("https://dev.motoko.ai/graphql", args),
+        ("prod", Some(args)) => gql("https://motoko.ai/graphql", args),
+        _ => quit("must specify either 'dev' or 'prod' tier"),
+    }
+}
+
+fn gql(endpoint: &str, args: &ArgMatches<'_>) {
+    // TODO(danj): cleanup
+    match args.value_of("json_payload") {
+        Some(payload) => {
+            let client = reqwest::blocking::Client::new();
+            let res = client
+                .post(endpoint)
+                .body(payload.to_owned())
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .send()
+                .unwrap()
+                .text()
+                .unwrap();
+            println!("{}", res);
+        }
+        _ => quit("must provide a JSON payload"),
+    }
+}
+
+fn install(args: &ArgMatches<'_>) {
+    match args.subcommand() {
+        ("aws", _) => install_aws(),
+        ("android", _) => install_android(),
+        ("ios", _) => install_ios(),
+        _ => quit("invalid install target!"),
+    }
+}
+
+fn install_aws() {
+    run_from(
+        "/tmp",
+        "curl",
+        &[
+            "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip",
+            "-o",
+            "awscliv2.zip",
+        ],
+    );
+    run_from("/tmp", "unzip", &["awscliv2.zip"]);
+    run_from("/tmp", "sudo", &["./aws/install"]);
+}
+
+fn install_android() {
+    build_frontend_android();
+    run_from(
+        "backend",
+        "bundletool",
+        &[
+            "install-apks",
+            "--apks",
+            "build/app/outputs/bundle/release/app-release.apks",
+        ],
+    );
+}
+
+fn install_ios() {
+    build_frontend_ios();
+    quit("installing iOS is not currently supported!");
 }
 
 fn build(args: &ArgMatches<'_>) {
-    ensure_on_clean_dev_or_prod_branch();
+    must_be_on(&["dev", "prod"]);
+    ensure_clean();
     match args.subcommand() {
         ("build-image", _) => build_build_image(),
         ("frontend", Some(args)) => build_frontend(args),
@@ -108,18 +206,29 @@ fn build(args: &ArgMatches<'_>) {
     }
 }
 
-fn ensure_on_clean_dev_or_prod_branch() {
-    if !["dev".to_owned(), "prod".to_owned()].contains(&run_from(
-        ".",
-        "git",
-        &["branch", "--show-current"],
-    )) {
+fn must_be_on(branches: &[&str]) {
+    if !branches
+        .iter()
+        .map(|b| b.to_string())
+        .collect::<String>()
+        .contains(&current_branch())
+    {
         quit("command can only be run from the 'dev' or 'prod' branches");
     }
 }
 
+fn current_branch() -> String {
+    return run_from(".", "git", &["branch", "--show-current"]);
+}
+
+fn ensure_clean() {
+    if !run_from(".", "git", &["--porcelain"]).is_empty() {
+        quit("branch is not clean");
+    }
+}
+
 fn build_build_image() {
-    run_from(".", "docker", &["build", "-t", "motoko", "."]);
+    run_from("build_image", "docker", &["build", "-t", "motoko", "."]);
 }
 
 fn build_frontend(args: &ArgMatches<'_>) {
@@ -160,7 +269,7 @@ fn build_frontend_android() {
 }
 
 fn build_frontend_ios() {
-    quit("build frontend iOS is not yet implemented!");
+    quit("building iOS frontend is not yet supported!");
 }
 
 fn build_frontend_web() {
@@ -186,7 +295,8 @@ fn build_all_backend_functions() {
 }
 
 fn deploy(args: &ArgMatches<'_>) {
-    ensure_on_clean_dev_or_prod_branch();
+    must_be_on(&["dev", "prod"]);
+    ensure_clean();
     match args.subcommand() {
         ("build-image", _) => deploy_build_image(),
         ("frontend", Some(args)) => deploy_frontend(args),
@@ -231,18 +341,22 @@ fn deploy_frontend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_frontend_android() {
-    //
-    // - aws s3 rm s3://${S3_BUCKET} --recursive
-    // - aws s3 cp frontend/build/web s3://${S3_BUCKET} --recursive
-    // TODO
+    quit("deploying Android frontend is not yet supported!");
 }
 
 fn deploy_frontend_ios() {
-    quit("deploy frontend ios is not yet implemented!");
+    quit("deploying iOS frontend is not yet supported!");
 }
 
 fn deploy_frontend_web() {
-    // TODO
+    let s3_bucket = format!("s3://{}-{}-www", current_repo(), current_branch());
+    run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
+    run_from(
+        "frontend",
+        "aws",
+        &["s3", "cp", "build/web", &s3_bucket, "--recursive"],
+    );
+    // TODO(danj): invalidate CloudFront distribution cache
 }
 
 fn deploy_backend(args: &ArgMatches<'_>) {
@@ -253,13 +367,24 @@ fn deploy_backend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_backend_function(name: &str) {
-    // TODO
+    run_from(
+        ".",
+        "rustup",
+        &["target", "add", "x86_64-unknown-linux-musl"],
+    );
+    run_from("backend/rs", "cargo", &["test"]);
+    run_from(
+        "backend/rs",
+        "cargo",
+        &[
+            "build",
+            "--release",
+            "--target",
+            "x86_64-unknown-linux-musl",
+        ],
+    );
 }
 
 fn deploy_all_backend_functions() {
-    // TODO
-}
-
-fn test(args: &ArgMatches<'_>) {
     // TODO
 }

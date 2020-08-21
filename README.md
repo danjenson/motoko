@@ -25,6 +25,16 @@
     [motoko-prod](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/projects/motoko-prod/details):
     - [Service Role](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role) has S3 access
 
+## Setup
+- `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
+- `./install_motoko_command`
+- `motoko install aws`
+- `aws configure`
+  - [Users -> user -> Security Keys](https://console.aws.amazon.com/iam/home#/users)
+  - [Regions](https://docs.aws.amazon.com/general/latest/gr/rande.html)
+    (default to `us-west-1`, which is Northern California)
+  - output format: `json`
+
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
   - NS Records:
