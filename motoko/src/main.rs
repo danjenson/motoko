@@ -87,7 +87,7 @@ fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
     if !output.status.success() {
         quit(&String::from_utf8(output.stderr).unwrap());
     }
-    return String::from_utf8(output.stdout).unwrap().trim().into();
+    String::from_utf8(output.stdout).unwrap().trim().into()
 }
 
 fn ensure_has(binary: &str) {
@@ -102,7 +102,7 @@ fn quit(s: &str) {
 }
 
 fn devops_subcommand(name: &str) -> App {
-    return SubCommand::with_name(name)
+    SubCommand::with_name(name)
         .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(SubCommand::with_name("build-image"))
         .subcommand(
@@ -118,7 +118,7 @@ fn devops_subcommand(name: &str) -> App {
                     .help("i.e. graphql (default: all)")
                     .required(false),
             ),
-        );
+        )
 }
 
 fn test(args: &ArgMatches<'_>) {
@@ -253,7 +253,7 @@ fn ensure_on_branch(branches: &[&str]) {
 }
 
 fn current_branch() -> String {
-    return run_from(".", "git", &["branch", "--show-current"]);
+    run_from(".", "git", &["branch", "--show-current"])
 }
 
 fn ensure_clean() {
@@ -393,7 +393,7 @@ fn deploy_frontend(args: &ArgMatches<'_>) {
 fn deploy_frontend_android() {
     ensure_on_branch(&["dev"]);
     let s3_bucket =
-        format!("s3://{}-{}-android", current_repo(), current_branch());
+        format!("s3://{}-{}-mobile", current_repo(), current_branch());
     run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
     run_from(
         "frontend",
@@ -402,7 +402,7 @@ fn deploy_frontend_android() {
             "s3",
             "cp",
             "build/app/outputs/bundle/release/app-release.apks",
-            &format!("{}/install", s3_bucket),
+            &format!("{}/install/motoko.apk", s3_bucket),
         ],
     );
     invalidate_cache();
@@ -498,15 +498,12 @@ fn exit_status(cmd: &str, args: &[&str]) -> ExitStatus {
     if status.is_err() {
         quit(&format!("failed to run: {} {}", cmd, args.join(" ")));
     }
-    return status.unwrap();
+    status.unwrap()
 }
 
 fn lambda_exists(name: &str) -> bool {
-    return exit_status(
-        "aws",
-        &["lambda", "get-function", "--function-name", name],
-    )
-    .success();
+    exit_status("aws", &["lambda", "get-function", "--function-name", name])
+        .success()
 }
 
 fn deploy_backend_function_invalidate_cache() {
