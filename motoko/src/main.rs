@@ -302,6 +302,11 @@ fn build_frontend_android() {
             "--output=build/app/outputs/bundle/release/app-release.apks",
         ],
     );
+    run_from(
+        "frontend",
+        "flutter",
+        &["build", "apk", "--release", "--split-per-abi"],
+    );
 }
 
 fn build_frontend_ios() {
