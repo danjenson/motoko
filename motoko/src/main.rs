@@ -287,11 +287,43 @@ fn build_backend(args: &ArgMatches<'_>) {
 }
 
 fn build_backend_function(name: &str) {
-    run_from("backend", "cargo", &["build", "--bin", name]);
+    run_from(
+        ".",
+        "rustup",
+        &["target", "add", "x86_64-unknown-linux-musl"],
+    );
+    run_from("backend/rs", "cargo", &["test"]);
+    run_from(
+        "backend/rs",
+        "cargo",
+        &[
+            "build",
+            "--release",
+            "--target",
+            "x86_64-unknown-linux-musl",
+            "--bin",
+            name,
+        ],
+    );
 }
 
 fn build_all_backend_functions() {
-    run_from("backend/rs", "cargo", &["build", "--bins"]);
+    run_from(
+        ".",
+        "rustup",
+        &["target", "add", "x86_64-unknown-linux-musl"],
+    );
+    run_from("backend/rs", "cargo", &["test"]);
+    run_from(
+        "backend/rs",
+        "cargo",
+        &[
+            "build",
+            "--release",
+            "--target",
+            "x86_64-unknown-linux-musl",
+        ],
+    );
 }
 
 fn deploy(args: &ArgMatches<'_>) {
@@ -367,6 +399,7 @@ fn deploy_backend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_backend_function(name: &str) {
+    build_backend_function(name);
     run_from(
         ".",
         "rustup",
@@ -381,10 +414,14 @@ fn deploy_backend_function(name: &str) {
             "--release",
             "--target",
             "x86_64-unknown-linux-musl",
+            "--bin",
+            name,
         ],
     );
+    // TODO deploy
 }
 
 fn deploy_all_backend_functions() {
-    // TODO
+    build_all_backend_functions();
+    // TODO deploy
 }
