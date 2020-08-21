@@ -459,6 +459,7 @@ fn lambda_exists(name: &str) -> bool {
 
 fn deploy_backend_function_invalidate_cache() {
     let zip_path = "/tmp/invalidate_cache.py.zip";
+    let fileb_zip_path = &format!("fileb://{}", zip_path);
     run_from(
         "backend/py",
         "zip",
@@ -475,7 +476,7 @@ fn deploy_backend_function_invalidate_cache() {
                 "--function-name",
                 function_name,
                 "--zip-file",
-                zip_path,
+                fileb_zip_path,
             ],
         );
     } else {
@@ -490,7 +491,7 @@ fn deploy_backend_function_invalidate_cache() {
                 "--handler",
                 "lambda_handler",
                 "--zip-file",
-                zip_path,
+                fileb_zip_path,
                 "--runtime",
                 "python3.8",
                 "--role",
