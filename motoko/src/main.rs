@@ -7,6 +7,7 @@ use which::which;
 
 fn main() {
     ensure_in_repo("motoko");
+    set_dir_to_git_root();
     let args = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
@@ -94,6 +95,15 @@ fn ensure_has(binary: &str) {
     if which(binary).is_err() {
         quit(&format!("missing required binary: {}", binary));
     }
+}
+
+fn set_dir_to_git_root() {
+    std::env::set_current_dir(run_from(
+        ".",
+        "git",
+        &["rev-parse", "--show-toplevel"],
+    ))
+    .expect("unable to set directory to git root!");
 }
 
 fn quit(s: &str) {
