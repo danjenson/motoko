@@ -244,17 +244,7 @@ fn build_frontend(args: &ArgMatches<'_>) {
 
 fn build_frontend_android() {
     run_from("frontend", "flutter", &["clean"]);
-    run_from(
-        "frontend",
-        "flutter",
-        &[
-            "build",
-            "appbundle",
-            "--release",
-            "--target-platform",
-            "android-arm,android-arm64,android-x86",
-        ],
-    );
+    run_from("frontend", "flutter", &["build", "appbundle", "--release"]);
     run_from(
         "frontend",
         "bundletool",
