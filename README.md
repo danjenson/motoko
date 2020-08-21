@@ -4,6 +4,7 @@
 
 ## TODO
 - docker image for CloudBuild
+  - add buildtool
 - build script for docker image
   - git clone repo
   - checkout commit hash

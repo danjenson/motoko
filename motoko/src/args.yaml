@@ -1,0 +1,77 @@
+name: motoko
+version: "0.1"
+about: motoko orchestration commands
+author: Daniel Jenson <daniel.a.jenson@gmail.com>
+settings: 
+  - ArgRequiredElseHelp
+subcommands:
+    - build:
+        about: build
+        settings:
+            - ArgRequiredElseHelp
+        subcommands:
+            - android:
+                about: build android
+                settings:
+                    - ArgRequiredElseHelp
+                subcommands:
+                    - apk:
+                        about: build individual apks
+                    - bundle:
+                        about: build app bundle for Play Store
+            - build-image:
+                about: build container image for automated deployment
+            - graphql:
+                about: build graphql lambda function
+            - ios:
+                about: build iOS
+            - web:
+                about: build website
+    - deploy:
+        about: deploy
+        settings:
+            - ArgRequiredElseHelp
+        subcommands:
+            - android:
+                about: deploy android
+                settings:
+                    - ArgRequiredElseHelp
+                subcommands:
+                    - apk:
+                        about: deploy individual apks
+                    - bundle:
+                        about: deploy app bundle for Play Store
+            - build-image:
+                about: deploy container image for automated deployment
+            - graphql:
+                about: deploy graphql lambda function
+            - ios:
+                about: deploy iOS
+            - invalidate-cache:
+                about: deploy invalidate-cache lambda function
+            - web:
+                about: deploy website
+    - install:
+        about: install
+        settings:
+            - ArgRequiredElseHelp
+        subcommands:
+          - android:
+              about: install Android app on connected device
+          - aws:
+              about: install AWS CLI v2
+          - ios:
+              about: install iOS app on connected device
+    - run:
+        about: run commands
+        settings:
+            - ArgRequiredElseHelp
+        subcommands:
+            - gql:
+                about: run graphql query
+                args:
+                    - payload:
+                        about: JSON payload
+                        required: true
+            - invalidate-cache:
+                about: invalidate CloudFront distribution cache
