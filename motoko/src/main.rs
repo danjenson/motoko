@@ -1,4 +1,5 @@
 use clap::{load_yaml, App, ArgMatches};
+use regex::Regex;
 use std::process::{exit, Command, ExitStatus, Stdio};
 use which::which;
 
@@ -96,7 +97,7 @@ fn set_dir_to_git_root() {
 fn auto() {
     ensure_on_branch(&["dev", "prod"]);
     let modified_files =
-        run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
+        &run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
     let frontend = Regex::new("[[:^alpha:]]frontend").unwrap();
     let graphql = Regex::new("[[:^alpha:]]backend/rs/gql").unwrap();
     let invalidate_cache =
