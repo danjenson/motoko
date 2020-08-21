@@ -285,43 +285,33 @@ fn build_backend(args: &ArgMatches<'_>) {
 }
 
 fn build_backend_function(name: &str) {
+    match name {
+        "graphql" => build_backend_function_graphql(),
+        _ => quit(&format!("invalid backend function name: {}", name)),
+    }
+}
+
+fn build_backend_function_graphql() {
     run_from(
         ".",
         "rustup",
         &["target", "add", "x86_64-unknown-linux-musl"],
     );
-    run_from("backend/rs", "cargo", &["test"]);
+    run_from("backend/rs/gql", "cargo", &["test"]);
     run_from(
-        "backend/rs",
+        "backend/rs/gql",
         "cargo",
         &[
             "build",
             "--release",
             "--target",
             "x86_64-unknown-linux-musl",
-            "--bin",
-            name,
         ],
     );
 }
 
 fn build_all_backend_functions() {
-    run_from(
-        ".",
-        "rustup",
-        &["target", "add", "x86_64-unknown-linux-musl"],
-    );
-    run_from("backend/rs", "cargo", &["test"]);
-    run_from(
-        "backend/rs",
-        "cargo",
-        &[
-            "build",
-            "--release",
-            "--target",
-            "x86_64-unknown-linux-musl",
-        ],
-    );
+    build_backend_function_graphql()
 }
 
 fn deploy(args: &ArgMatches<'_>) {
@@ -397,10 +387,17 @@ fn deploy_backend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_backend_function(name: &str) {
+    match name {
+        "graphql" => deploy_backend_function_graphql(),
+        _ => quit(&format!("invalid backend function name: {}", name)),
+    }
+}
+
+fn deploy_backend_function_graphql() {
     let function_name =
-        &format!("{}-{}-{}", current_repo(), name, current_branch());
+        &format!("{}-graphql-{}", current_repo(), current_branch());
     let build_dir = "target/x86_64-unknown-linux-musl/release";
-    let binary_path = &format!("{}/{}", build_dir, name);
+    let binary_path = &format!("{}/graphql", build_dir);
     let binary_bootstrap_path = &format!("{}/{}", build_dir, "bootstrap");
     let binary_bootstrap_path_zip =
         &format!("{}/{}", build_dir, "bootstrap.zip");
@@ -419,7 +416,7 @@ fn deploy_backend_function(name: &str) {
     .success()
     {
         run_from(
-            "backend/rs",
+            "backend/rs/gql",
             "aws",
             &[
                 "lambda",
@@ -432,7 +429,7 @@ fn deploy_backend_function(name: &str) {
         );
     } else {
         run_from(
-            "backend/rs",
+            "backend/rs/gql",
             "aws",
             &[
                 "lambda",
@@ -465,5 +462,5 @@ fn exit_status(cmd: &str, args: &[&str]) -> ExitStatus {
 }
 
 fn deploy_all_backend_functions() {
-    deploy_backend_function("graphql");
+    deploy_backend_function_graphql();
 }

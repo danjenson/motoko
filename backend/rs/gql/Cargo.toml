@@ -1,5 +1,5 @@
 [package]
-name = "motoko"
+name = "gql"
 version = "0.1.0"
 authors = ["Daniel Jenson <daniel.a.jenson@gmail.com>"]
 edition = "2018"
