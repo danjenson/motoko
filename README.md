@@ -5,7 +5,13 @@
 ## TODO
 - docker image for CloudBuild
 - build script for docker image
+  - git clone repo
+  - checkout commit hash
+  - get files changed
+    - grep frontend -> build & deploy frontend
+    - grep backend -> build & deploy backend
   - secrets?
+- codebuild to automate builds
 - apk hosting - S3?
 - motoko.ai/privacy - flutter route?
 - google auth submit for review
