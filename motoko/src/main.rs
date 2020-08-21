@@ -3,7 +3,7 @@ use clap::{
     AppSettings, Arg, ArgMatches, SubCommand,
 };
 use std::fs;
-use std::process::{exit, Command, Stdio};
+use std::process::{exit, Command, ExitStatus};
 use which::which;
 
 fn main() {
@@ -75,23 +75,15 @@ fn current_repo() -> String {
 fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
     ensure_has(cmd);
     eprintln!("[ {:>15} ] {} {}", from, cmd, args.join(" "),);
-    let output = Command::new(cmd)
-        .args(args)
-        .current_dir(from)
-        .stdout(Stdio::piped())
-        .output();
-    if output.is_err() {
-        quit(&format!(
-            "{} {:?} failed from directory {}",
-            cmd,
-            args.join(" "),
-            from
-        ));
+    let res = Command::new(cmd).args(args).current_dir(from).output();
+    if res.is_err() {
+        quit("failed to execute");
     }
-    return String::from_utf8(output.unwrap().stdout)
-        .unwrap()
-        .trim()
-        .into();
+    let output = res.unwrap();
+    if !output.status.success() {
+        quit("failed");
+    }
+    return String::from_utf8(output.stdout).unwrap().trim().into();
 }
 
 fn ensure_has(binary: &str) {
@@ -229,6 +221,8 @@ fn current_branch() -> String {
 }
 
 fn ensure_clean() {
+    let x = run_from(".", "git", &["--porcelain"]);
+    eprintln!("'{}': {}", x, x.is_empty());
     if !run_from(".", "git", &["--porcelain"]).is_empty() {
         quit("branch is not clean");
     }
@@ -406,29 +400,73 @@ fn deploy_backend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_backend_function(name: &str) {
-    build_backend_function(name);
-    run_from(
-        ".",
-        "rustup",
-        &["target", "add", "x86_64-unknown-linux-musl"],
-    );
-    run_from("backend/rs", "cargo", &["test"]);
+    let function_name =
+        &format!("{}-{}-{}", current_repo(), name, current_branch());
+    let build_dir = "target/x86_64-unknown-linux-musl/release";
+    let binary_path = &format!("{}/{}", build_dir, name);
+    let binary_bootstrap_path = &format!("{}/{}", build_dir, "bootstrap");
+    let binary_bootstrap_path_zip =
+        &format!("{}/{}", build_dir, "bootstrap.zip");
+    let fileb_binary_bootstrap_path_zip =
+        &format!("fileb://{}", binary_bootstrap_path_zip);
+    run_from("backend/rs", "cp", &[binary_path, binary_bootstrap_path]);
     run_from(
         "backend/rs",
-        "cargo",
-        &[
-            "build",
-            "--release",
-            "--target",
-            "x86_64-unknown-linux-musl",
-            "--bin",
-            name,
-        ],
+        "zip",
+        &["-j", binary_bootstrap_path_zip, binary_bootstrap_path],
     );
-    // TODO deploy
+    if exit_status(
+        "aws",
+        &["lambda", "get-function", "--function-name", function_name],
+    )
+    .success()
+    {
+        run_from(
+            "backend/rs",
+            "aws",
+            &[
+                "lambda",
+                "update-function-code",
+                "--function-name",
+                function_name,
+                "--zip-file",
+                fileb_binary_bootstrap_path_zip,
+            ],
+        );
+    } else {
+        run_from(
+            "backend/rs",
+            "aws",
+            &[
+                "lambda",
+                "create-function",
+                "--function-name",
+                function_name,
+                "--handler",
+                "doesnt.matter",
+                "--zip-file",
+                fileb_binary_bootstrap_path_zip,
+                "--runtime",
+                "provided",
+                "--role",
+                "arn:aws:iam::902096072945:role/motoko-lambda",
+                "--environment",
+                "Variables={RUST_BACKTRACE=1}",
+                "--tracing-config",
+                "Mode=Active",
+            ],
+        );
+    }
+}
+
+fn exit_status(cmd: &str, args: &[&str]) -> ExitStatus {
+    let status = Command::new(cmd).args(args).status();
+    if status.is_err() {
+        quit(&format!("failed to run: {} {}", cmd, args.join(" ")));
+    }
+    return status.unwrap();
 }
 
 fn deploy_all_backend_functions() {
-    build_all_backend_functions();
-    // TODO deploy
+    deploy_backend_function("graphql");
 }
