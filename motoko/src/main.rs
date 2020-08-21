@@ -242,7 +242,10 @@ fn ensure_on_branch(branches: &[&str]) {
         .collect::<String>()
         .contains(&current_branch())
     {
-        quit("command can only be run from the 'dev' or 'prod' branches");
+        quit(&format!(
+            "command can only be run from the following branches: {:#?}",
+            branches
+        ));
     }
 }
 
