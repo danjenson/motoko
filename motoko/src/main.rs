@@ -74,19 +74,24 @@ fn current_repo() -> String {
 
 fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
     ensure_has(cmd);
-    return String::from_utf8(
-        Command::new(cmd)
-            .args(args)
-            .current_dir(from)
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap()
-    .trim()
-    .into();
+    eprintln!("[ {:>15} ] {} {}", from, cmd, args.join(" "),);
+    let output = Command::new(cmd)
+        .args(args)
+        .current_dir(from)
+        .stdout(Stdio::piped())
+        .output();
+    if output.is_err() {
+        quit(&format!(
+            "{} {:?} failed from directory {}",
+            cmd,
+            args.join(" "),
+            from
+        ));
+    }
+    return String::from_utf8(output.unwrap().stdout)
+        .unwrap()
+        .trim()
+        .into();
 }
 
 fn ensure_has(binary: &str) {
@@ -96,7 +101,7 @@ fn ensure_has(binary: &str) {
 }
 
 fn quit(s: &str) {
-    eprintln!("{}", s);
+    eprintln!("\n{}\n", s);
     exit(1);
 }
 
@@ -164,23 +169,25 @@ fn install(args: &ArgMatches<'_>) {
 }
 
 fn install_aws() {
-    run_from(
-        "/tmp",
-        "curl",
-        &[
-            "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip",
-            "-o",
-            "awscliv2.zip",
-        ],
-    );
-    run_from("/tmp", "unzip", &["awscliv2.zip"]);
-    run_from("/tmp", "sudo", &["./aws/install"]);
+    if which("aws").is_err() {
+        run_from(
+            "/tmp",
+            "curl",
+            &[
+                "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip",
+                "-o",
+                "awscliv2.zip",
+            ],
+        );
+        run_from("/tmp", "unzip", &["awscliv2.zip"]);
+        run_from("/tmp", "sudo", &["./aws/install"]);
+    }
 }
 
 fn install_android() {
     build_frontend_android();
     run_from(
-        "backend",
+        "frontend",
         "bundletool",
         &[
             "install-apks",
@@ -262,8 +269,8 @@ fn build_frontend_android() {
         &[
             "build-apks",
             "--overwrite",
-            "--bundle",
-            "build/app/outputs/bundle/release/app-release.apks",
+            "--bundle=build/app/outputs/bundle/release/app-release.aab",
+            "--output=build/app/outputs/bundle/release/app-release.apks",
         ],
     );
 }
@@ -361,12 +368,12 @@ fn deploy_build_image() {
 }
 
 fn deploy_frontend(args: &ArgMatches<'_>) {
-    match args.value_of("function") {
+    match args.value_of("target") {
         Some("android") => deploy_frontend_android(),
         Some("ios") => deploy_frontend_ios(),
         Some("web") => deploy_frontend_web(),
         Some(&_) | None => {
-            deploy_frontend_android();
+            // TODO(danj): deploy Android/iOS
             deploy_frontend_web()
         }
     }
