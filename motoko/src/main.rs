@@ -52,6 +52,7 @@ fn main() {
         ("deploy", args) => deploy(args.expect("missing deploy target!")),
         _ => quit("invalid subcommand!"),
     }
+    eprintln!("success!");
 }
 
 fn ensure_in_repo(name: &str) {
