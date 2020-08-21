@@ -5,6 +5,8 @@ author: Daniel Jenson <daniel.a.jenson@gmail.com>
 settings: 
   - ArgRequiredElseHelp
 subcommands:
+    - auto:
+        about: build and deploy all modified code
     - build:
         about: build
         settings:

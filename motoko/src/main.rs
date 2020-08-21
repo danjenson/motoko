@@ -7,10 +7,11 @@ fn main() {
     set_dir_to_git_root();
     let args = App::from(load_yaml!("args.yaml")).get_matches();
     match args.subcommand() {
-        ("build", args) => build(args.expect("missing a build target!")),
-        ("deploy", args) => deploy(args.expect("missing deploy target!")),
-        ("install", args) => install(args.expect("missing install arguments!")),
-        ("run", args) => run(args.expect("missing run arguments!")),
+        ("auto", _) => auto(),
+        ("build", Some(args)) => build(args),
+        ("deploy", Some(args)) => deploy(args),
+        ("install", Some(args)) => install(args),
+        ("run", Some(args)) => run(args),
         _ => quit("invalid subcommand!"),
     }
     eprintln!("\nsuccess!\n");
@@ -92,6 +93,32 @@ fn set_dir_to_git_root() {
     .expect("unable to set directory to git root!");
 }
 
+fn auto() {
+    ensure_on_branch(&["dev", "prod"]);
+    let modified_files =
+        run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
+    let frontend = Regex::new("[[:^alpha:]]frontend").unwrap();
+    let graphql = Regex::new("[[:^alpha:]]backend/rs/gql").unwrap();
+    let invalidate_cache =
+        Regex::new("[[:^alpha:]]backend/py/invalidate_cache").unwrap();
+    match modified_files {
+        _ if frontend.is_match(modified_files) => {
+            build_android_apks();
+            deploy_android_apks();
+            build_web();
+            deploy_web();
+        }
+        _ if graphql.is_match(modified_files) => {
+            build_graphql();
+            deploy_graphql();
+        }
+        _ if invalidate_cache.is_match(modified_files) => {
+            deploy_invalidate_cache();
+        }
+        _ => eprintln!("nothing to do!"),
+    }
+}
+
 fn build(args: &ArgMatches) {
     ensure_on_branch(&["dev", "prod"]);
     match args.subcommand() {
@@ -123,7 +150,6 @@ fn current_branch() -> String {
 }
 
 fn build_android(args: &ArgMatches) {
-    ensure_clean("frontend");
     match args.subcommand() {
         ("apk", _) => build_android_apks(),
         ("bundle", _) => build_android_bundle(),
@@ -131,13 +157,14 @@ fn build_android(args: &ArgMatches) {
     }
 }
 
-fn ensure_clean(dir: &str) {
-    if !run_from(".", "git", &["status", "--porcelain", dir]).is_empty() {
-        quit(&format!("directory '{}' is not clean", dir));
+fn ensure_clean(path: &str) {
+    if !run_from(".", "git", &["status", "--porcelain", path]).is_empty() {
+        quit(&format!("directory '{}' is not clean", path));
     }
 }
 
 fn build_android_apks() {
+    ensure_clean("frontend");
     run_from("frontend", "flutter", &["clean"]);
     run_from(
         "frontend",
@@ -147,6 +174,7 @@ fn build_android_apks() {
 }
 
 fn build_android_bundle() {
+    ensure_clean("frontend");
     run_from("frontend", "flutter", &["clean"]);
     run_from("frontend", "flutter", &["build", "appbundle", "--release"]);
     run_from(
@@ -362,6 +390,7 @@ fn lambda_exists(name: &str) -> bool {
 }
 
 fn deploy_invalidate_cache() {
+    ensure_clean("backend/py/invalidate_cache.py");
     let zip_path = "/tmp/invalidate_cache.py.zip";
     let fileb_zip_path = &format!("fileb://{}", zip_path);
     run_from(
