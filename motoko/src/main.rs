@@ -109,7 +109,7 @@ fn devops_subcommand(name: &str) -> App {
         )
         .subcommand(
             SubCommand::with_name("backend").arg(
-                Arg::with_name("function_name")
+                Arg::with_name("function")
                     .help("i.e. graphql (default: all)")
                     .required(false),
             ),
@@ -379,7 +379,6 @@ fn deploy_backend(args: &ArgMatches<'_>) {
 }
 
 fn deploy_backend_function(name: &str) {
-    eprintln!("{}", name);
     match name {
         "graphql" => deploy_backend_function_graphql(),
         "invalidate-cache" => deploy_backend_function_invalidate_cache(),
