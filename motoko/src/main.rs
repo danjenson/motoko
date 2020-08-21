@@ -40,7 +40,8 @@ fn main() {
                                         .required(true),
                                 ),
                         ),
-                ),
+                )
+                .subcommand(SubCommand::with_name("invalidate-cache")),
         )
         .subcommand(devops_subcommand("build"))
         .subcommand(devops_subcommand("deploy"))
@@ -120,6 +121,7 @@ fn devops_subcommand(name: &str) -> App {
 fn test(args: &ArgMatches<'_>) {
     match args.subcommand() {
         ("gql", Some(args)) => test_gql(args),
+        ("invalidate-cache", _) => test_invalidate_cache(),
         _ => quit("invalid test target!"),
     }
 }
@@ -149,6 +151,34 @@ fn gql(endpoint: &str, args: &ArgMatches<'_>) {
         }
         _ => quit("must provide a JSON payload"),
     }
+}
+
+fn test_invalidate_cache() {
+    ensure_on_branch(&["dev", "prod"]);
+    let cloudfront_distribution_id = if current_branch() == "dev" {
+        "E1O86QQ54GNZCY"
+    } else {
+        "E2CR4IH7H1BW7N"
+    };
+
+    run_from(
+        ".",
+        "aws",
+        &[
+            "lambda",
+            "invoke",
+            "--cli-binary-format",
+            "raw-in-base64-out",
+            "--function-name",
+            "motoko-invalidate-cache",
+            "--payload",
+            &format!(
+                "{{ \"distribution_id\": \"{}\" }}",
+                cloudfront_distribution_id
+            ),
+            "/tmp/invalidate-cache.json",
+        ],
+    );
 }
 
 fn install(args: &ArgMatches<'_>) {
@@ -195,7 +225,7 @@ fn install_ios() {
 }
 
 fn build(args: &ArgMatches<'_>) {
-    must_be_on(&["dev", "prod"]);
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean();
     match args.subcommand() {
         ("build-image", _) => build_build_image(),
@@ -205,7 +235,7 @@ fn build(args: &ArgMatches<'_>) {
     }
 }
 
-fn must_be_on(branches: &[&str]) {
+fn ensure_on_branch(branches: &[&str]) {
     if !branches
         .iter()
         .map(|b| b.to_string())
@@ -308,7 +338,7 @@ fn build_all_backend_functions() {
 }
 
 fn deploy(args: &ArgMatches<'_>) {
-    must_be_on(&["dev", "prod"]);
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean();
     match args.subcommand() {
         ("build-image", _) => deploy_build_image(),
@@ -490,7 +520,7 @@ fn deploy_backend_function_invalidate_cache() {
                 "--function-name",
                 function_name,
                 "--handler",
-                "lambda_handler",
+                "invalidate_cache.lambda_handler",
                 "--zip-file",
                 fileb_zip_path,
                 "--runtime",
