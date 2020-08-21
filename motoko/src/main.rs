@@ -416,7 +416,7 @@ fn deploy_frontend_android() {
         &[
             "s3",
             "cp",
-            "build/app/outputs/bundle/release/app-release.apks",
+            "build/app/outputs/apk/release/app-arm64-v8a-release.apk",
             &format!("{}/install/motoko.apk", s3_bucket),
         ],
     );
