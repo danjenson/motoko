@@ -283,7 +283,7 @@ fn build_frontend_web() {
     run_from("frontend", "flutter", &["channel", "beta"]);
     run_from("frontend", "flutter", &["upgrade"]);
     run_from("frontend", "flutter", &["config", "--enable-web"]);
-    run_from("frontend", "flutter", &["build", "web"]);
+    run_from("frontend", "flutter", &["build", "web", "--release"]);
 }
 
 fn build_backend(args: &ArgMatches<'_>) {

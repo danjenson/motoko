@@ -13,6 +13,7 @@
 - error dialog
 - get rights to Motoko font for mobile apps too
 - motoko pypi sdk
+- [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
 ## Deployment
 - run `cargo build`
