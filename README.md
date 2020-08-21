@@ -5,7 +5,7 @@
 ## TODO
 - docker image for CloudBuild
 - build script for docker image
-- lambda function for invalidating cloudfront distribution: https://medium.com/taptuit/automated-build-deploy-with-aws-codepipeline-f0714d62f61c
+  - secrets?
 - apk hosting - S3?
 - motoko.ai/privacy - flutter route?
 - google auth submit for review

@@ -105,7 +105,7 @@ fn devops_subcommand(name: &str) -> App {
         .subcommand(
             SubCommand::with_name("frontend").arg(
                 Arg::with_name("target")
-                    .help("i.e. android, ios, web (default: all)")
+                    .help("i.e. android, ios, www (default: all)")
                     .required(false),
             ),
         )
@@ -121,7 +121,7 @@ fn devops_subcommand(name: &str) -> App {
 fn test(args: &ArgMatches<'_>) {
     match args.subcommand() {
         ("gql", Some(args)) => test_gql(args),
-        ("invalidate-cache", _) => test_invalidate_cache(),
+        ("invalidate-cache", _) => invalidate_cache(),
         _ => quit("invalid test target!"),
     }
 }
@@ -153,7 +153,7 @@ fn gql(endpoint: &str, args: &ArgMatches<'_>) {
     }
 }
 
-fn test_invalidate_cache() {
+fn invalidate_cache() {
     ensure_on_branch(&["dev", "prod"]);
     let cloudfront_distribution_id = if current_branch() == "dev" {
         "E1O86QQ54GNZCY"
@@ -264,11 +264,11 @@ fn build_frontend(args: &ArgMatches<'_>) {
     match args.value_of("target") {
         Some("android") => build_frontend_android(),
         Some("ios") => build_frontend_ios(),
-        Some("web") => build_frontend_web(),
+        Some("www") => build_frontend_www(),
         Some(&_) | None => {
-            build_frontend_android();
             // TODO(danj): add iOS
-            build_frontend_web()
+            build_frontend_android();
+            build_frontend_www()
         }
     }
 }
@@ -292,7 +292,7 @@ fn build_frontend_ios() {
     quit("building iOS frontend is not yet supported!");
 }
 
-fn build_frontend_web() {
+fn build_frontend_www() {
     run_from("frontend", "flutter", &["channel", "beta"]);
     run_from("frontend", "flutter", &["upgrade"]);
     run_from("frontend", "flutter", &["config", "--enable-web"]);
@@ -375,23 +375,37 @@ fn deploy_frontend(args: &ArgMatches<'_>) {
     match args.value_of("target") {
         Some("android") => deploy_frontend_android(),
         Some("ios") => deploy_frontend_ios(),
-        Some("web") => deploy_frontend_web(),
+        Some("www") => deploy_frontend_www(),
         Some(&_) | None => {
-            // TODO(danj): deploy Android/iOS
-            deploy_frontend_web()
+            // TODO(danj): deploy iOS
+            deploy_frontend_android();
+            deploy_frontend_www();
         }
     }
 }
 
 fn deploy_frontend_android() {
-    quit("deploying Android frontend is not yet supported!");
+    ensure_on_branch(&["dev"]);
+    let s3_bucket =
+        format!("s3://{}-{}-android", current_repo(), current_branch());
+    run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
+    run_from(
+        "frontend",
+        "aws",
+        &[
+            "s3",
+            "cp",
+            "build/app/outputs/bundle/release/app-release.apks",
+            &format!("{}/install", s3_bucket),
+        ],
+    );
 }
 
 fn deploy_frontend_ios() {
     quit("deploying iOS frontend is not yet supported!");
 }
 
-fn deploy_frontend_web() {
+fn deploy_frontend_www() {
     let s3_bucket = format!("s3://{}-{}-www", current_repo(), current_branch());
     run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
     run_from(
@@ -399,7 +413,7 @@ fn deploy_frontend_web() {
         "aws",
         &["s3", "cp", "build/web", &s3_bucket, "--recursive"],
     );
-    // TODO(danj): invalidate CloudFront distribution cache
+    invalidate_cache();
 }
 
 fn deploy_backend(args: &ArgMatches<'_>) {
