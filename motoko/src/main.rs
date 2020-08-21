@@ -63,14 +63,17 @@ fn ensure_in_repo(name: &str) {
 }
 
 fn current_repo() -> String {
-    return run_from(".", "git", &["config", "--get", "remote.origin.url"])
-        .rsplit("/")
-        .next()
-        .unwrap()
-        .split(".")
-        .next()
-        .unwrap()
-        .into();
+    let cmd = "git";
+    let args = &["config", "--get", "remote.origin.url"];
+    if !Command::new(cmd)
+        .args(args)
+        .status()
+        .expect("failed to run git!")
+        .success()
+    {
+        quit("must run from a git repository");
+    }
+    run_from(".", cmd, args).rsplit("/").next().unwrap().into()
 }
 
 fn run_from(from: &str, cmd: &str, args: &[&str]) -> String {
