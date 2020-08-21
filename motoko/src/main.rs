@@ -278,6 +278,7 @@ fn build_backend(args: &ArgMatches<'_>) {
 fn build_backend_function(name: &str) {
     match name {
         "graphql" => build_backend_function_graphql(),
+        "invalidate-cache" => {} // python function doesn't need to be built
         _ => quit(&format!("invalid backend function name: {}", name)),
     }
 }
@@ -380,6 +381,7 @@ fn deploy_backend(args: &ArgMatches<'_>) {
 fn deploy_backend_function(name: &str) {
     match name {
         "graphql" => deploy_backend_function_graphql(),
+        "invalidate-cache" => deploy_backend_function_invalidate_cache(),
         _ => quit(&format!("invalid backend function name: {}", name)),
     }
 }
@@ -400,12 +402,7 @@ fn deploy_backend_function_graphql() {
         "zip",
         &["-j", binary_bootstrap_path_zip, binary_bootstrap_path],
     );
-    if exit_status(
-        "aws",
-        &["lambda", "get-function", "--function-name", function_name],
-    )
-    .success()
-    {
+    if lambda_exists(function_name) {
         run_from(
             "backend/rs/gql",
             "aws",
@@ -452,6 +449,58 @@ fn exit_status(cmd: &str, args: &[&str]) -> ExitStatus {
     return status.unwrap();
 }
 
+fn lambda_exists(name: &str) -> bool {
+    return exit_status(
+        "aws",
+        &["lambda", "get-function", "--function-name", name],
+    )
+    .success();
+}
+
+fn deploy_backend_function_invalidate_cache() {
+    let zip_path = "/tmp/invalidate_cache.py.zip";
+    run_from(
+        "backend/py",
+        "zip",
+        &["-j", zip_path, "invalidate_cache.py"],
+    );
+    let function_name = "motoko-invalidate-cache";
+    if lambda_exists(function_name) {
+        run_from(
+            ".",
+            "aws",
+            &[
+                "lambda",
+                "update-function-code",
+                "--function-name",
+                function_name,
+                "--zip-file",
+                zip_path,
+            ],
+        );
+    } else {
+        run_from(
+            ".",
+            "aws",
+            &[
+                "lambda",
+                "create-function",
+                "--function-name",
+                function_name,
+                "--handler",
+                "lambda_handler",
+                "--zip-file",
+                zip_path,
+                "--runtime",
+                "python3.8",
+                "--role",
+                "arn:aws:iam::902096072945:role/motoko-lambda",
+            ],
+        );
+    }
+}
+
 fn deploy_all_backend_functions() {
     deploy_backend_function_graphql();
+    deploy_backend_function_invalidate_cache();
 }
