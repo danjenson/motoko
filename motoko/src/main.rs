@@ -19,7 +19,9 @@ fn main() {
 }
 
 fn ensure_in_repo(name: &str) {
-    if current_repo() != name {
+    // `current_repo()` doesn't work inside CodeBuild because the entry point
+    // of the build script is in a shallow copy of the repo with no config
+    if current_repo() != name && std::env::var("CODEBUILD_BUILD_ARN").is_err() {
         quit(&format!("must be run from the '{}' git repository", name));
     }
 }
