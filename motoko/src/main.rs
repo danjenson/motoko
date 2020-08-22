@@ -21,9 +21,13 @@ fn main() {
 fn ensure_in_repo(name: &str) {
     // `current_repo()` doesn't work inside CodeBuild because the entry point
     // of the build script is in a shallow copy of the repo with no config
-    if current_repo() != name && std::env::var("CODEBUILD_BUILD_ARN").is_err() {
+    if current_repo() != name && !is_cloudbuild() {
         quit(&format!("must be run from the '{}' git repository", name));
     }
+}
+
+fn is_cloudbuild() {
+    std::env::var("CODEBUILD_BUILD_ARN").is_ok()
 }
 
 fn current_repo() -> String {
@@ -142,7 +146,10 @@ fn build_android(args: &ArgMatches) {
 }
 
 fn ensure_clean(path: &str) {
-    if !run_from(".", "git", &["status", "--porcelain", path]).is_empty() {
+    // intermediate build files are not ignored by git in cloudbuild
+    if !run_from(".", "git", &["status", "--porcelain", path]).is_empty()
+        && !is_cloudbuild()
+    {
         quit(&format!("directory '{}' is not clean", path));
     }
 }
@@ -455,18 +462,19 @@ fn deploy_last_commit() {
     let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/gql").unwrap();
     let invalidate_cache =
         Regex::new("(^|[[:^alpha:]])backend/py/invalidate_cache").unwrap();
-    if frontend.is_match(modified_files) {
-        build_android_apks();
-        deploy_android_apks();
-        build_web();
-        deploy_web();
-    }
+    // execute in topological order
     if graphql.is_match(modified_files) {
         build_graphql();
         deploy_graphql();
     }
     if invalidate_cache.is_match(modified_files) {
         deploy_invalidate_cache();
+    }
+    if frontend.is_match(modified_files) {
+        build_android_apks();
+        deploy_android_apks();
+        build_web();
+        deploy_web();
     }
 }
 
