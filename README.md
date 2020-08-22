@@ -3,8 +3,6 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- docker image for CloudBuild
-  - add buildtool
 - build script for docker image
   - git clone repo
   - checkout prod
@@ -20,7 +18,11 @@
 - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
 ## Deployment
-- TODO
+- codebuild is set up for `prod`:
+  - [build Docker image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)
+  - [codebuild role](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role)
+    has Lambda and S3 permissions
+  - [codebuild pipeline]()
 
 ## Setup
 - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 

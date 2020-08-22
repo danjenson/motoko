@@ -4,8 +4,6 @@ environment_variables:
 phases:
   build:
     commands:
-      - echo build
-  post_build:
-    commands:
-      - bash -c 'if [ "$CODEBUILD_BUILD_SUCCEEDING" == "0" ]; then exit 1; fi'
-      - echo post build
+      - git branch
+      - ./install_motoko_command
+      - motoko auto

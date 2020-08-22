@@ -56,7 +56,7 @@ fn quit_cmd_from(from: &str, cmd: &str, args: &[&str]) {
 }
 
 fn quit(s: &str) {
-    eprintln!("\n{}\n", s);
+    eprintln!("\nstderr:\n{}\nfailed!", s);
     exit(1);
 }
 
