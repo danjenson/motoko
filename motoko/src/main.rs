@@ -26,7 +26,7 @@ fn ensure_in_repo(name: &str) {
     }
 }
 
-fn is_cloudbuild() {
+fn is_cloudbuild() -> bool {
     std::env::var("CODEBUILD_BUILD_ARN").is_ok()
 }
 
