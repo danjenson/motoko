@@ -56,7 +56,7 @@ fn quit_cmd_from(from: &str, cmd: &str, args: &[&str]) {
 }
 
 fn quit(s: &str) {
-    eprintln!("\nstderr:\n{}\nfailed!", s);
+    eprintln!("\nstderr:\n\n{}\n\nfailed!", s);
     exit(1);
 }
 
@@ -165,7 +165,10 @@ fn build_android_bundle() {
 }
 
 fn build_build_image() {
+    run_from("motoko", "cargo", &["build", "--release"]);
+    run_from(".", "cp", &["motoko/target/release/motoko", "build_image"]);
     run_from("build_image", "docker", &["build", "-t", "motoko", "."]);
+    run_from(".", "rm", &["build_image/motoko"]);
 }
 
 fn build_graphql() {
