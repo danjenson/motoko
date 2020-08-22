@@ -309,10 +309,21 @@ fn deploy_build_image() {
         ".",
         "docker",
         &[
+            "login",
+            "--username",
+            "AWS",
+            "--password",
+            &credentials,
+            "902096072945.dkr.ecr.us-west-1.amazonaws.com/motoko:latest",
+        ],
+    );
+    run_from(
+        ".",
+        "docker",
+        &[
             "tag",
             "motoko:latest",
             "902096072945.dkr.ecr.us-west-1.amazonaws.com/motoko:latest",
-            &credentials,
         ],
     );
     run_from(

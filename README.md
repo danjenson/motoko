@@ -7,13 +7,10 @@
   - add buildtool
 - build script for docker image
   - git clone repo
-  - checkout commit hash
-  - get files changed
-    - grep frontend -> build & deploy frontend
-    - grep backend -> build & deploy backend
+  - checkout prod
+  - motoko auto
   - secrets?
 - codebuild to automate builds
-- apk hosting - S3?
 - motoko.ai/privacy - flutter route?
 - google auth submit for review
 - backend queries and mutations
@@ -23,15 +20,7 @@
 - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
 ## Deployment
-- run `cargo build`
-- build environment is specified by a [Dockerfile] and is pushed to AWS ECR
-- push deploy/
-- motoko.ai:
-  - CodeBuild runs
-    [buildspec-prod.yml](https://github.com/danjenson/motoko/blob/master/buildspec-prod.yml)
-    for
-    [motoko-prod](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/projects/motoko-prod/details):
-    - [Service Role](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role) has S3 access
+- TODO
 
 ## Setup
 - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
@@ -42,6 +31,7 @@
   - [Regions](https://docs.aws.amazon.com/general/latest/gr/rande.html)
     (default to `us-west-1`, which is Northern California)
   - output format: `json`
+- `motoko -h`
 
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
