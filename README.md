@@ -54,6 +54,8 @@
       - mapped to this [CloudFront
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E2CR4IH7H1BW7N)
         - re-routes traffic from motoko.ai/graphql to api.motoko.ai/graphql
+        - re-routes traffic from motoko.ai/install/* to
+          [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-prod-mobile/?region=us-west-1)
         - re-routes traffic from motoko.ai/* to S3 bucket
           [motoko-prod-www](https://console.aws.amazon.com/s3/buckets/motoko-prod-www/?region=us-west-1&tab=overview):
           - allows access by OAI (Origin Access Identity) to CloudFront
@@ -72,6 +74,8 @@
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E1O86QQ54GNZCY)
         - re-routes traffic from dev.motoko.ai/graphql to
           api.dev.motoko.ai/graphql
+        - re-routes traffic from motoko.ai/install/* to
+          [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-dev-mobile/?region=us-west-1)
         - re-routes traffic from dev.motoko.ai/* to S3 bucket
           [motoko-dev-www](https://console.aws.amazon.com/s3/buckets/motoko-dev-www/?region=us-west-1&tab=overview):
           - allows access by OAI (Origin Access Identity) to CloudFront

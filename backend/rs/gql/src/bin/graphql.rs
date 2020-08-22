@@ -34,7 +34,7 @@ fn my_handler(
 ) -> Result<CustomOutput, HandlerError> {
     if e.first_name == "" {
         error!("Empty first name in request: {}", c.aws_request_id);
-        return Err("Empty first name".into());
+        return Err("Empty first name...".into());
     }
 
     Ok(CustomOutput {

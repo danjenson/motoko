@@ -15,7 +15,7 @@ class Statistic extends StatelessWidget {
                   Card(elevation: 3.0, child: ListTile(title: Text(opID))))
               .toList()),
       title: 'results',
-      preview: Expanded(child: Container(child: Text('results'))),
+      preview: Expanded(child: Container(child: Text('summary'))),
     );
   }
 }

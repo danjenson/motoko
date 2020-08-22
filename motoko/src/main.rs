@@ -32,7 +32,14 @@ fn current_repo() -> String {
     if !exit_status_from(".", cmd, args).success() {
         quit("must run from a git repository");
     }
-    run_from(".", cmd, args).rsplit("/").next().unwrap().into()
+    run_from(".", cmd, args)
+        .rsplit("/")
+        .next()
+        .unwrap()
+        .rsplit('.')
+        .next()
+        .unwrap()
+        .into()
 }
 
 fn exit_status_from(from: &str, cmd: &str, args: &[&str]) -> ExitStatus {
