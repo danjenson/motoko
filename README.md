@@ -3,12 +3,6 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- build script for docker image
-  - git clone repo
-  - checkout prod
-  - motoko auto
-  - secrets?
-- codebuild to automate builds
 - motoko.ai/privacy - flutter route?
 - google auth submit for review
 - backend queries and mutations
@@ -30,18 +24,27 @@
 
 ## Infrastructure
 - Frontend uses [flutter](https://flutter.dev/)
-- Backend uses API Gateway and Lambda Functions; most code is in rust or python
+- Backend uses API Gateway and Lambda Functions; most code is written in rust
+  or python
 
 ## Deployment
-- automatic deployment for `prod` is setup using AWS CodeBuild:
-  - [AWS sample docs](https://docs.aws.amazon.com/codebuild/latest/userguide/sample-ecr.html)
-  - [ECR permissions](https://us-west-1.console.aws.amazon.com/ecr/repositories/motoko/permissions?region=us-west-1)
-  - [Docker image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)
-  - [CodeBuild role](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role)
-    has ECR, Lambda, and S3 permissions
-  - [CodeBuild pipeline](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/902096072945/projects/motoko-prod/history?region=us-west-1)
-  - [buildspec.yaml](https://github.com/danjenson/motoko/blob/prod/buildspec.yml) has build steps
-- deployment for `dev` can be managed through the `motoko` command
+- automatic deployment for the `dev` and `prod` branches is setup for every
+  push using [AWS CodeBuild](https://docs.aws.amazon.com/codebuild/latest/userguide/sample-ecr.html)
+  - the [custom build image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)
+    is hosted on [AWS ECR](https://us-west-1.console.aws.amazon.com/ecr/repositories/motoko/permissions?region=us-west-1)
+  - CodeBuild [dev](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-dev-service-role)
+    and [prod](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role)
+    roles have ECR, Lambda, and S3 permissions
+  - [buildspec.yaml](https://github.com/danjenson/motoko/blob/prod/buildspec.yml)
+    contains the build steps
+  - the CodeBuild [dev](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/902096072945/projects/motoko-dev/history?region=us-west-1)
+    and [prod](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/902096072945/projects/motoko-prod/history?region=us-west-1)
+    pipelines provide the progress and logs for builds
+- if the build script changes, i.e. the `motoko` command, the build image will
+  need to be redeployed, since it orchestrates the builds:
+  - `./install_motoko_command`
+  - `motoko build build-image`
+  - `motoko deploy build-image`
 
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
