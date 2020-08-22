@@ -229,7 +229,7 @@ fn deploy_android(args: &ArgMatches) {
 }
 
 fn deploy_android_apks() {
-    ensure_on_branch(&["dev"]);
+    ensure_on_branch(&["dev", "prod"]);
     let s3_bucket =
         format!("s3://{}-{}-mobile", current_repo(), current_branch());
     run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
