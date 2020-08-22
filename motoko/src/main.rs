@@ -36,7 +36,8 @@ fn current_repo() -> String {
         .rsplit("/")
         .next()
         .unwrap()
-        .rsplit('.')
+        .split('.')
+        .next()
         .unwrap()
         .into()
 }
@@ -454,17 +455,17 @@ fn deploy_last_commit() {
     let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/gql").unwrap();
     let invalidate_cache =
         Regex::new("(^|[[:^alpha:]])backend/py/invalidate_cache").unwrap();
-    if frontend.is_match(modified_files) => {
+    if frontend.is_match(modified_files) {
         build_android_apks();
         deploy_android_apks();
         build_web();
         deploy_web();
     }
-    if graphql.is_match(modified_files) => {
+    if graphql.is_match(modified_files) {
         build_graphql();
         deploy_graphql();
     }
-    if invalidate_cache.is_match(modified_files) => {
+    if invalidate_cache.is_match(modified_files) {
         deploy_invalidate_cache();
     }
 }

@@ -33,7 +33,7 @@ fn my_handler(
     c: lambda::Context,
 ) -> Result<CustomOutput, HandlerError> {
     if e.first_name == "" {
-        error!("Empty first name in request: {}", c.aws_request_id);
+        error!("Empty first name in request {}", c.aws_request_id);
         return Err("Empty first name".into());
     }
 
