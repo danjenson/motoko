@@ -17,14 +17,7 @@
 - motoko pypi sdk
 - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
-## Deployment
-- codebuild is set up for `prod`:
-  - [build Docker image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)
-  - [codebuild role](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role)
-    has Lambda and S3 permissions
-  - [codebuild pipeline]()
-
-## Setup
+## Local Setup
 - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
 - `./install_motoko_command`
 - `motoko install aws`
@@ -34,6 +27,21 @@
     (default to `us-west-1`, which is Northern California)
   - output format: `json`
 - `motoko -h`
+
+## Infrastructure
+- Frontend uses [flutter](https://flutter.dev/)
+- Backend uses API Gateway and Lambda Functions; most code is in rust or python
+
+## Deployment
+- automatic deployment for `prod` is setup using AWS CodeBuild:
+  - [AWS sample docs](https://docs.aws.amazon.com/codebuild/latest/userguide/sample-ecr.html)
+  - [ECR permissions](https://us-west-1.console.aws.amazon.com/ecr/repositories/motoko/permissions?region=us-west-1)
+  - [Docker image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)
+  - [CodeBuild role](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role)
+    has ECR, Lambda, and S3 permissions
+  - [CodeBuild pipeline](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/902096072945/projects/motoko-prod/history?region=us-west-1)
+  - [buildspec.yaml](https://github.com/danjenson/motoko/blob/prod/buildspec.yml) has build steps
+- deployment for `dev` can be managed through the `motoko` command
 
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
