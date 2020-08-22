@@ -1,10 +1,6 @@
 version: 0.1
-environment_variables:
-  git-credential-helper: true
 phases:
   build:
     commands:
-      - git branch
-      - sudo apt install pkg-config
-      - ./install_motoko_command
-      - motoko auto
+      - git checkout prod
+      - motoko deploy-last-commit

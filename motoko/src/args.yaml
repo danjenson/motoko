@@ -5,8 +5,6 @@ author: Daniel Jenson <daniel.a.jenson@gmail.com>
 settings: 
   - ArgRequiredElseHelp
 subcommands:
-    - auto:
-        about: build and deploy all modified code
     - build:
         about: build
         settings:
@@ -53,6 +51,8 @@ subcommands:
                 about: deploy invalidate-cache lambda function
             - web:
                 about: deploy website
+    - deploy-last-commit:
+        about: build and deploy code from last commit
     - install:
         about: install
         settings:

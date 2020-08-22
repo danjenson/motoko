@@ -8,9 +8,9 @@ fn main() {
     set_dir_to_git_root();
     let args = App::from(load_yaml!("args.yaml")).get_matches();
     match args.subcommand() {
-        ("auto", _) => auto(),
         ("build", Some(args)) => build(args),
         ("deploy", Some(args)) => deploy(args),
+        ("deploy-last-commit", _) => deploy_last_commit(),
         ("install", Some(args)) => install(args),
         ("run", Some(args)) => run(args),
         _ => quit("invalid subcommand!"),
@@ -92,32 +92,6 @@ fn set_dir_to_git_root() {
         &["rev-parse", "--show-toplevel"],
     ))
     .expect("unable to set directory to git root!");
-}
-
-fn auto() {
-    ensure_on_branch(&["dev", "prod"]);
-    let modified_files =
-        &run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
-    let frontend = Regex::new("(^|[[:^alpha:]])frontend").unwrap();
-    let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/gql").unwrap();
-    let invalidate_cache =
-        Regex::new("(^|[[:^alpha:]])backend/py/invalidate_cache").unwrap();
-    match modified_files {
-        _ if frontend.is_match(modified_files) => {
-            build_android_apks();
-            deploy_android_apks();
-            build_web();
-            deploy_web();
-        }
-        _ if graphql.is_match(modified_files) => {
-            build_graphql();
-            deploy_graphql();
-        }
-        _ if invalidate_cache.is_match(modified_files) => {
-            deploy_invalidate_cache();
-        }
-        _ => eprintln!("\nnothing to do!"),
-    }
 }
 
 fn build(args: &ArgMatches) {
@@ -459,6 +433,32 @@ fn deploy_web() {
         &["s3", "cp", "build/web", &s3_bucket, "--recursive"],
     );
     invalidate_cache();
+}
+
+fn deploy_last_commit() {
+    ensure_on_branch(&["dev", "prod"]);
+    let modified_files =
+        &run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
+    let frontend = Regex::new("(^|[[:^alpha:]])frontend").unwrap();
+    let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/gql").unwrap();
+    let invalidate_cache =
+        Regex::new("(^|[[:^alpha:]])backend/py/invalidate_cache").unwrap();
+    match modified_files {
+        _ if frontend.is_match(modified_files) => {
+            build_android_apks();
+            deploy_android_apks();
+            build_web();
+            deploy_web();
+        }
+        _ if graphql.is_match(modified_files) => {
+            build_graphql();
+            deploy_graphql();
+        }
+        _ if invalidate_cache.is_match(modified_files) => {
+            deploy_invalidate_cache();
+        }
+        _ => eprintln!("\nnothing to do!"),
+    }
 }
 
 fn install(args: &ArgMatches) {
