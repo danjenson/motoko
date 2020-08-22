@@ -17,7 +17,7 @@ class Data extends StatelessWidget {
     'Color': 'enum',
     'Size': 'float',
   };
-  final rows = List.filled(100, {
+  final rows = List.filled(20, {
     'Name': 'Sarah',
     'Age': '19',
     'Role': 'Student',
