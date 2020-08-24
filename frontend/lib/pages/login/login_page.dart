@@ -20,9 +20,9 @@ class LoginPage extends StatelessWidget {
                       fontSize: 75.0)),
               SizedBox(height: 50),
               Transform.scale(
-                  scale: 1.25,
+                  scale: 1.15,
                   child: SignInButton(Buttons.Google,
-                      onPressed: () => auth.signInWithGoogle())),
+                      onPressed: () => auth.signInWithGoogle(context))),
             ])));
   }
 }

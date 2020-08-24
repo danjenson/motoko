@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../common/profile.dart';
 import 'nav.dart';
@@ -15,7 +16,7 @@ class HomePage extends StatelessWidget {
       return nav;
     }, child: Consumer<Nav>(builder: (context, nav, _) {
       return WillPopScope(
-          // navigate back with back button
+          // override default back button action to use nav
           onWillPop: () async {
             nav.back();
             return false;
@@ -23,11 +24,17 @@ class HomePage extends StatelessWidget {
           child: Scaffold(
               appBar: AppBar(
                 centerTitle: true,
-                title: Text('motoko',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontFamily: 'Brushstrike-TTF',
-                        fontSize: 35.0)),
+                title: RichText(
+                    text: TextSpan(
+                        text: 'motoko',
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () {
+                            nav.to(0);
+                          },
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.secondary,
+                            fontFamily: 'Brushstrike-TTF',
+                            fontSize: 35.0))),
                 elevation: 5.0,
               ),
               // refocus body when tapping outside inputs

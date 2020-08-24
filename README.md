@@ -3,10 +3,9 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- motoko.ai/privacy - flutter route?
-- google auth submit for review
+- google login
 - backend queries and mutations
-- error dialog
+- google auth submit for review
 - get rights to Motoko font for mobile apps too
 - motoko pypi sdk
 - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
