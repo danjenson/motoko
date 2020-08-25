@@ -32,6 +32,8 @@ subcommands:
         settings:
             - ArgRequiredElseHelp
         subcommands:
+            - all:
+                about: build and deploy everything
             - android:
                 about: deploy android
                 settings:
@@ -49,10 +51,10 @@ subcommands:
                 about: deploy iOS
             - invalidate-cache:
                 about: deploy invalidate-cache lambda function
+            - last-commit:
+                about: build and deploy last commit
             - web:
                 about: deploy website
-    - deploy-last-commit:
-        about: build and deploy code from last commit
     - install:
         about: install
         settings:
@@ -69,6 +71,10 @@ subcommands:
         settings:
             - ArgRequiredElseHelp
         subcommands:
+            - reset-android-keystore:
+                about: resets keystore used for signing android apps
+            - setup-android-keystore:
+                about: sets up keystore locally for signing android apps
             - gql:
                 about: run graphql query
                 args:

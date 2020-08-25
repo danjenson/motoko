@@ -1,5 +1,8 @@
 use clap::{load_yaml, App, ArgMatches};
 use regex::Regex;
+use std::fs::{create_dir_all, remove_file, OpenOptions};
+use std::io::Write;
+use std::path::Path;
 use std::process::{exit, Command, ExitStatus, Stdio};
 use which::which;
 
@@ -10,7 +13,6 @@ fn main() {
     match args.subcommand() {
         ("build", Some(args)) => build(args),
         ("deploy", Some(args)) => deploy(args),
-        ("deploy-last-commit", _) => deploy_last_commit(),
         ("install", Some(args)) => install(args),
         ("run", Some(args)) => run(args),
         _ => quit("invalid subcommand!"),
@@ -37,7 +39,7 @@ fn current_repo() -> String {
         quit("must run from a git repository");
     }
     run_from(".", cmd, args)
-        .rsplit("/")
+        .rsplit('/')
         .next()
         .unwrap()
         .split('.')
@@ -108,7 +110,6 @@ fn set_dir_to_git_root() {
 }
 
 fn build(args: &ArgMatches) {
-    ensure_on_branch(&["dev", "prod"]);
     match args.subcommand() {
         ("android", Some(args)) => build_android(args),
         ("build-image", _) => build_build_image(),
@@ -138,6 +139,10 @@ fn current_branch() -> String {
 }
 
 fn build_android(args: &ArgMatches) {
+    ensure_on_branch(&["dev", "prod"]);
+    if is_cloudbuild() {
+        setup_android_keystore();
+    }
     match args.subcommand() {
         ("apk", _) => build_android_apks(),
         ("bundle", _) => build_android_bundle(),
@@ -188,6 +193,7 @@ fn build_build_image() {
 }
 
 fn build_graphql() {
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean("backend/rs/gql");
     run_from(
         ".",
@@ -208,11 +214,13 @@ fn build_graphql() {
 }
 
 fn build_ios() {
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean("frontend");
     quit("building iOS is not yet supported!");
 }
 
 fn build_web() {
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean("frontend");
     run_from("frontend", "flutter", &["channel", "beta"]);
     run_from("frontend", "flutter", &["upgrade"]);
@@ -222,19 +230,32 @@ fn build_web() {
 }
 
 fn deploy(args: &ArgMatches) {
-    ensure_on_branch(&["dev", "prod"]);
     match args.subcommand() {
+        ("all", _) => deploy_all(),
         ("android", Some(args)) => deploy_android(args),
         ("build-image", _) => deploy_build_image(),
         ("graphql", _) => deploy_graphql(),
         ("ios", _) => deploy_ios(),
         ("invalidate-cache", _) => deploy_invalidate_cache(),
+        ("last-commit", _) => deploy_last_commit(),
         ("web", _) => deploy_web(),
         _ => quit("invalid deploy target!"),
     }
 }
 
+fn deploy_all() {
+    ensure_on_branch(&["dev", "prod"]);
+    build_graphql();
+    deploy_graphql();
+    deploy_invalidate_cache();
+    build_android_apks();
+    deploy_android_apks();
+    build_web();
+    deploy_web();
+}
+
 fn deploy_android(args: &ArgMatches) {
+    ensure_on_branch(&["dev", "prod"]);
     match args.subcommand() {
         ("apk", _) => deploy_android_apks(),
         ("bundle", _) => deploy_android_bundle(),
@@ -254,7 +275,7 @@ fn deploy_android_apks() {
             "s3",
             "cp",
             "build/app/outputs/apk/release/app-arm64-v8a-release.apk",
-            &format!("{}/install/motoko.apk", s3_bucket),
+            &format!("{}/install/android", s3_bucket),
         ],
     );
     invalidate_cache();
@@ -330,6 +351,7 @@ fn deploy_build_image() {
 }
 
 fn deploy_graphql() {
+    ensure_on_branch(&["dev", "prod"]);
     let dir = "backend/rs/gql";
     let function_name =
         &format!("{}-graphql-{}", current_repo(), current_branch());
@@ -395,6 +417,7 @@ fn lambda_exists(name: &str) -> bool {
 }
 
 fn deploy_invalidate_cache() {
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean("backend/py/invalidate_cache.py");
     let zip_path = "/tmp/invalidate_cache.py.zip";
     let fileb_zip_path = &format!("fileb://{}", zip_path);
@@ -440,18 +463,8 @@ fn deploy_invalidate_cache() {
 }
 
 fn deploy_ios() {
+    ensure_on_branch(&["dev", "prod"]);
     quit("deploying iOS frontend is not yet supported!");
-}
-
-fn deploy_web() {
-    let s3_bucket = format!("s3://{}-{}-www", current_repo(), current_branch());
-    run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
-    run_from(
-        "frontend",
-        "aws",
-        &["s3", "cp", "build/web", &s3_bucket, "--recursive"],
-    );
-    invalidate_cache();
 }
 
 fn deploy_last_commit() {
@@ -476,6 +489,18 @@ fn deploy_last_commit() {
         build_web();
         deploy_web();
     }
+}
+
+fn deploy_web() {
+    ensure_on_branch(&["dev", "prod"]);
+    let s3_bucket = format!("s3://{}-{}-www", current_repo(), current_branch());
+    run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
+    run_from(
+        "frontend",
+        "aws",
+        &["s3", "cp", "build/web", &s3_bucket, "--recursive"],
+    );
+    invalidate_cache();
 }
 
 fn install(args: &ArgMatches) {
@@ -515,6 +540,11 @@ fn run(args: &ArgMatches) {
     match args.subcommand() {
         ("gql", Some(args)) => gql(args),
         ("invalidate-cache", _) => invalidate_cache(),
+        ("reset-android-keystore", _) => {
+            reset_android_keystore();
+            setup_android_keystore();
+        }
+        ("setup-android-keystore", _) => setup_android_keystore(),
         _ => quit("invalid test target!"),
     }
 }
@@ -543,4 +573,174 @@ fn _gql(endpoint: &str, args: &ArgMatches) {
         }
         _ => quit("must provide a JSON payload"),
     }
+}
+
+fn reset_android_keystore() {
+    let path = Path::new("/tmp/signing_key.jks");
+    if path.exists() {
+        remove_file(path).expect("unable to remove old temporary signing key!");
+    }
+    let pw = rpassword::read_password_from_tty(Some("Password: ")).unwrap();
+    generate_android_keystore(&pw, &path);
+    put_android_keystore(&path);
+    put_android_keystore_password(&pw);
+    remove_file(path).unwrap_or_else(|_| {
+        panic!("unable to remove file: {}", path.to_string_lossy())
+    });
+}
+
+fn generate_android_keystore(password: &str, path: &Path) {
+    run_from(
+        ".",
+        "keytool",
+        &[
+            "-genkey",
+            "-dname",
+            "cn=Daniel Jenson, o=motoko, c=US",
+            "-keystore",
+            &path.to_string_lossy(),
+            "-keyalg",
+            "RSA",
+            "-keysize",
+            "2048",
+            "-validity",
+            "10000",
+            "-alias",
+            "signing_key",
+            "-keypass",
+            password,
+            "-storepass",
+            password,
+        ],
+    );
+}
+
+fn put_android_keystore(path: &Path) {
+    put_secret(
+        "android_keystore",
+        SecretType::Binary,
+        &format!("fileb://{}", path.to_string_lossy()),
+    );
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum SecretType {
+    Binary,
+    String,
+}
+
+fn put_secret(name: &str, secret_type: SecretType, value: &str) {
+    let secret_flag = if secret_type == SecretType::Binary {
+        "--secret-binary"
+    } else {
+        "--secret-string"
+    };
+    if secret_exists(name) {
+        run_from(
+            ".",
+            "aws",
+            &[
+                "secretsmanager",
+                "put-secret-value",
+                "--secret-id",
+                name,
+                secret_flag,
+                value,
+            ],
+        );
+    } else {
+        run_from(
+            ".",
+            "aws",
+            &[
+                "secretsmanager",
+                "create-secret",
+                "--name",
+                name,
+                secret_flag,
+                value,
+            ],
+        );
+    }
+}
+
+fn secret_exists(name: &str) -> bool {
+    exit_status_from(
+        ".",
+        "aws",
+        &["secretsmanager", "get-secret-value", "--secret-id", name],
+    )
+    .success()
+}
+
+fn put_android_keystore_password(pw: &str) {
+    put_secret("android_keystore_password", SecretType::String, pw);
+}
+
+fn setup_android_keystore() {
+    let home_dir = dirs::home_dir()
+        .expect("unable to get user's home directory!")
+        .into_os_string()
+        .into_string()
+        .expect("unable to convert home directory into string for path!");
+    let keystore_path_str =
+        &format!("{}/.keys/motoko/android/signing_key.jks", home_dir);
+    let keystore_path = Path::new(keystore_path_str);
+    let keystore_dir = keystore_path.parent().unwrap();
+    let keystore_dir_str = keystore_dir.to_string_lossy();
+    let key_properties_path = Path::new("frontend/android/key.properties");
+    let key_properties_path_str = key_properties_path.to_string_lossy();
+    create_dir_all(keystore_dir).unwrap_or_else(|_| {
+        panic!("unable to create key directory: {}", keystore_dir_str)
+    });
+    let ks = get_secret("android_keystore", SecretType::Binary);
+    let mut keystore = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(keystore_path)
+        .unwrap_or_else(|_| panic!("unable to open {}", keystore_path_str));
+    keystore.write_all(&ks).unwrap_or_else(|_| {
+        panic!("unable to write keystore to {}", keystore_path_str)
+    });
+    let pw = get_secret("android_keystore_password", SecretType::String);
+    let mut key_properties = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(key_properties_path)
+        .unwrap_or_else(|_| {
+            panic!("unable to open: {}", key_properties_path_str)
+        });
+    let key_properties_content = [
+        &format!("storePassword={}", std::str::from_utf8(&pw).unwrap()),
+        &format!("keyPassword={}", std::str::from_utf8(&pw).unwrap()),
+        "keyAlias=signing_key",
+        &format!("storeFile={}", keystore_path_str),
+    ]
+    .join("\n");
+    key_properties
+        .write_all(&key_properties_content.as_bytes())
+        .unwrap_or_else(|_| {
+            panic!(
+                "unable to write key properties file to {}",
+                key_properties_path_str
+            )
+        });
+}
+
+fn get_secret(name: &str, secret_type: SecretType) -> Vec<u8> {
+    let json_str = run_from(
+        ".",
+        "aws",
+        &["secretsmanager", "get-secret-value", "--secret-id", name],
+    );
+    let v: serde_json::Value =
+        serde_json::from_str(&json_str).expect("unable to parse json secret!");
+    let value: Vec<u8>;
+    if secret_type == SecretType::Binary {
+        value = base64::decode(v["SecretBinary"].as_str().unwrap())
+            .expect("unable to decode base64 binary secret!");
+    } else {
+        value = v["SecretString"].as_str().unwrap().as_bytes().to_owned();
+    };
+    value
 }

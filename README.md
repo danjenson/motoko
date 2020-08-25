@@ -33,7 +33,7 @@
     is hosted on [AWS ECR](https://us-west-1.console.aws.amazon.com/ecr/repositories/motoko/permissions?region=us-west-1)
   - CodeBuild [dev](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-dev-service-role)
     and [prod](https://console.aws.amazon.com/iam/home?#/roles/codebuild-motoko-prod-service-role)
-    roles have ECR, Lambda, and S3 permissions
+    roles have ECR, Lambda, S3, and Secret Manager permissions
   - [buildspec.yaml](https://github.com/danjenson/motoko/blob/prod/buildspec.yml)
     contains the build steps
   - the CodeBuild [dev](https://us-west-1.console.aws.amazon.com/codesuite/codebuild/902096072945/projects/motoko-dev/history?region=us-west-1)
@@ -44,6 +44,28 @@
   - `./install_motoko_command`
   - `motoko build build-image`
   - `motoko deploy build-image`
+### Signing
+- android requires a keystore to sign the release app:
+  - to setup building locally using the release keys, run
+    `motoko run setup-android-keystore`, which does the following:
+      - downloads the android keystore to
+        `~/.keys/motoko/android/signing_key.jks`
+      - creates the file `motoko/android/key.properties`, which contains the
+        password to unlock the keystore (also from AWS Secrets Manager) and is
+        used when building by gradle; do not check this file into the code repo
+  - to reset the keystore in AWS Secrets Manager, run `motoko run
+    reset-android-keystore '<password>'`, which does the following:
+      - generates a new keystore and uploads it to AWS Secrets Manager with the
+        key `android_keystore` along with the password under the key
+        `android_keystore_password`
+      - runs the same commands as `motoko run setup-android-keystore` to setup
+        the local environment to use the new keys
+      - __NOTE__: after a reset, you will need to run `./gradlew signingReport`
+        and copy the debug and release SHA1 hashes into the OAuth2 clients
+        configs:
+        [motoko-android-debug](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-d95mopk70t0o0d9gphomcncu3961ge9s.apps.googleusercontent.com?project=motoko-286819)
+        and
+        [motoko-android-release](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-nk7lev14vc27gpa6o30c2o0mc25btmge.apps.googleusercontent.com?project=motoko-286819)
 
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):

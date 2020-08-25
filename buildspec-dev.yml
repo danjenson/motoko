@@ -3,4 +3,4 @@ phases:
   build:
     commands:
       - git checkout dev
-      - motoko deploy-last-commit
+      - motoko deploy last-commit
