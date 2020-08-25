@@ -139,10 +139,6 @@ fn current_branch() -> String {
 }
 
 fn build_android(args: &ArgMatches) {
-    ensure_on_branch(&["dev", "prod"]);
-    if is_cloudbuild() {
-        setup_android_keystore();
-    }
     match args.subcommand() {
         ("apk", _) => build_android_apks(),
         ("bundle", _) => build_android_bundle(),
@@ -160,7 +156,11 @@ fn ensure_clean(path: &str) {
 }
 
 fn build_android_apks() {
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean("frontend");
+    if is_cloudbuild() {
+        setup_android_keystore();
+    }
     run_from("frontend", "flutter", &["clean"]);
     run_from(
         "frontend",
@@ -170,7 +170,11 @@ fn build_android_apks() {
 }
 
 fn build_android_bundle() {
+    ensure_on_branch(&["dev", "prod"]);
     ensure_clean("frontend");
+    if is_cloudbuild() {
+        setup_android_keystore();
+    }
     run_from("frontend", "flutter", &["clean"]);
     run_from("frontend", "flutter", &["build", "appbundle", "--release"]);
     run_from(
