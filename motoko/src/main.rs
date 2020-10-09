@@ -477,12 +477,17 @@ fn lambda_exists(name: &str) -> bool {
 
 fn deploy_python_lambda_function(name: &str) {
     ensure_on_branch(&["dev", "prod"]);
-    let py_fname = format!("{}.py", &name.replace("-", "_"));
-    let path = format!("backend/py/{}", py_fname);
-    ensure_clean(&path);
-    let zip_path = format!("/tmp/{}.zip", py_fname);
+    let dir = format!("backend/py/lambdas/{}", &name.replace("-", "_"));
+    ensure_clean(&dir);
+    let zip_path = format!("/tmp/{}.zip", name);
     let fileb_zip_path = &format!("fileb://{}", zip_path);
-    run_from("backend/py", "zip", &["-j", &zip_path, &py_fname]);
+    run_from(
+        &dir,
+        "pip",
+        &["install", "-r", "requirements.txt", "--target", "deps"],
+    );
+    run_from(&format!("{}/deps", dir), "zip", &["-r9", &zip_path, "."]);
+    run_from(&dir, "zip", &["-g", &zip_path, "main.py"]);
     let function_name = format!("motoko-{}", name);
     if lambda_exists(&function_name) {
         run_from(
@@ -507,7 +512,7 @@ fn deploy_python_lambda_function(name: &str) {
                 "--function-name",
                 &function_name,
                 "--handler",
-                &format!("{}.lambda_handler", &name.replace("-", "_")),
+                "main.lambda_handler",
                 "--zip-file",
                 fileb_zip_path,
                 "--runtime",
