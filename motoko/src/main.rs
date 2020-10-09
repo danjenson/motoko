@@ -507,7 +507,7 @@ fn deploy_python_lambda_function(name: &str) {
                 "--function-name",
                 &function_name,
                 "--handler",
-                &format!("{}.lambda_handler", &"name".replace("-", "_")),
+                &format!("{}.lambda_handler", &name.replace("-", "_")),
                 "--zip-file",
                 fileb_zip_path,
                 "--runtime",
