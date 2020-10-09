@@ -3,7 +3,6 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- graphql:
 - lambdas:
   - infer data types
   - upload dataset with types
@@ -55,7 +54,10 @@
   - `GRANT ALL PRIVILEGES ON DATABASE motoko TO motoko;`
 - setup environment to connect:
   - `vim motoko/backend/rs/gql/.env`:
-    - `postgres://motoko:<password>@localhost/motoko  # app client`
+    - `ADDRESS=http://127.0.0.1:3000`
+    - `DATABASE_URL=postgres://motoko:<password>@localhost/motoko  # app client`
+    - `GOOGLE_OAUTH_CLIENT_ID=<ID>`
+    - `JWT_KEY=<key>`
 - run migrations:
   - `sqlx migrate run`
 
@@ -76,7 +78,7 @@
   or python
 
 ## Data Models
-[data models](./data_models.png)
+![model graph](https://github.com/danjenson/motoko/blob/prod/backend/rs/gql/models.pdf)
 
 #### Creating a Migration
 - `sqlx migrate add <name> # fill out in migrations/<name>.sql`
