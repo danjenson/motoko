@@ -1,6 +1,6 @@
 use clap::{load_yaml, App, ArgMatches};
 use regex::Regex;
-use std::fs::{create_dir_all, remove_file, OpenOptions};
+use std::fs::{create_dir_all, remove_file, File};
 use std::io::Write;
 use std::path::Path;
 use std::process::{exit, Command, ExitStatus, Stdio};
@@ -9,12 +9,13 @@ use which::which;
 fn main() {
     ensure_in_repo("motoko");
     set_dir_to_git_root();
-    let args = App::from(load_yaml!("args.yaml")).get_matches();
+    let yaml_args = load_yaml!("args.yaml");
+    let args = App::from(yaml_args).get_matches();
     match args.subcommand() {
-        ("build", Some(args)) => build(args),
-        ("deploy", Some(args)) => deploy(args),
-        ("install", Some(args)) => install(args),
-        ("run", Some(args)) => run(args),
+        Some(("build", args)) => build(args),
+        Some(("deploy", args)) => deploy(args),
+        Some(("install", args)) => install(args),
+        Some(("run", args)) => run(args),
         _ => quit("invalid subcommand!"),
     }
     eprintln!("\nsuccess!\n");
@@ -111,11 +112,11 @@ fn set_dir_to_git_root() {
 
 fn build(args: &ArgMatches) {
     match args.subcommand() {
-        ("android", Some(args)) => build_android(args),
-        ("build-image", _) => build_build_image(),
-        ("graphql", _) => build_graphql(),
-        ("ios", _) => build_ios(),
-        ("web", _) => build_web(),
+        Some(("android", args)) => build_android(args),
+        Some(("build-image", _)) => build_build_image(),
+        Some(("graphql", args)) => build_graphql(args),
+        Some(("ios", _)) => build_ios(),
+        Some(("web", _)) => build_web(),
         _ => quit("invalid build target!"),
     }
 }
@@ -140,8 +141,8 @@ fn current_branch() -> String {
 
 fn build_android(args: &ArgMatches) {
     match args.subcommand() {
-        ("apk", _) => build_android_apks(),
-        ("bundle", _) => build_android_bundle(),
+        Some(("apk", _)) => build_android_apks(),
+        Some(("bundle", _)) => build_android_bundle(),
         _ => quit("must specify either 'apk' or 'bundle'"),
     }
 }
@@ -165,8 +166,18 @@ fn build_android_apks() {
     run_from(
         "frontend",
         "flutter",
-        &["build", "apk", "--release", "--split-per-abi"],
+        &[
+            "build",
+            "apk",
+            &build_tier_flag(),
+            "--release",
+            "--split-per-abi",
+        ],
     );
+}
+
+fn build_tier_flag() -> String {
+    format!("--dart-define=TIER={}", current_branch())
 }
 
 fn build_android_bundle() {
@@ -196,7 +207,15 @@ fn build_build_image() {
     run_from(".", "rm", &["build_image/motoko"]);
 }
 
-fn build_graphql() {
+fn build_graphql(args: &ArgMatches) {
+    match args.subcommand() {
+        Some(("lambda", _)) => build_graphql_lambda(),
+        Some(("server", _)) => build_graphql_server(),
+        _ => quit("invalid graphql binary!"),
+    }
+}
+
+fn build_graphql_lambda() {
     ensure_on_branch(&["dev", "prod"]);
     ensure_clean("backend/rs/gql");
     run_from(
@@ -213,7 +232,18 @@ fn build_graphql() {
             "--release",
             "--target",
             "x86_64-unknown-linux-musl",
+            "--bin",
+            "lambda",
         ],
+    );
+}
+
+fn build_graphql_server() {
+    run_from("backend/rs/gql", "cargo", &["test"]);
+    run_from(
+        "backend/rs/gql",
+        "cargo",
+        &["build", "--release", "--bin", "server"],
     );
 }
 
@@ -235,23 +265,29 @@ fn build_web() {
 
 fn deploy(args: &ArgMatches) {
     match args.subcommand() {
-        ("all", _) => deploy_all(),
-        ("android", Some(args)) => deploy_android(args),
-        ("build-image", _) => deploy_build_image(),
-        ("graphql", _) => deploy_graphql(),
-        ("ios", _) => deploy_ios(),
-        ("invalidate-cache", _) => deploy_invalidate_cache(),
-        ("last-commit", _) => deploy_last_commit(),
-        ("web", _) => deploy_web(),
+        Some(("all", _)) => deploy_all(),
+        Some(("android", args)) => deploy_android(args),
+        Some(("build-image", _)) => deploy_build_image(),
+        Some(("graphql", _)) => deploy_graphql_lambda(),
+        Some(("ios", _)) => deploy_ios(),
+        Some(("infer_datatypes", _)) => {
+            deploy_python_lambda_function("infer-datatypes")
+        }
+        Some(("invalidate-cache", _)) => {
+            deploy_python_lambda_function("invalidate-cache")
+        }
+        Some(("last-commit", _)) => deploy_last_commit(),
+        Some(("web", _)) => deploy_web(),
         _ => quit("invalid deploy target!"),
     }
 }
 
 fn deploy_all() {
     ensure_on_branch(&["dev", "prod"]);
-    build_graphql();
-    deploy_graphql();
-    deploy_invalidate_cache();
+    build_graphql_lambda();
+    deploy_graphql_lambda();
+    deploy_python_lambda_function("invalidate-cache");
+    deploy_python_lambda_function("infer-datatypes");
     build_android_apks();
     deploy_android_apks();
     build_web();
@@ -261,8 +297,8 @@ fn deploy_all() {
 fn deploy_android(args: &ArgMatches) {
     ensure_on_branch(&["dev", "prod"]);
     match args.subcommand() {
-        ("apk", _) => deploy_android_apks(),
-        ("bundle", _) => deploy_android_bundle(),
+        Some(("apk", _)) => deploy_android_apks(),
+        Some(("bundle", _)) => deploy_android_bundle(),
         _ => quit("must specify either 'apk' or 'bundle'"),
     }
 }
@@ -354,13 +390,13 @@ fn deploy_build_image() {
     );
 }
 
-fn deploy_graphql() {
+fn deploy_graphql_lambda() {
     ensure_on_branch(&["dev", "prod"]);
-    let dir = "backend/rs/gql";
+    let dir = "backend/rs/query";
     let function_name =
         &format!("{}-graphql-{}", current_repo(), current_branch());
     let build_dir = "target/x86_64-unknown-linux-musl/release";
-    let binary_path = &format!("{}/graphql", build_dir);
+    let binary_path = &format!("{}/lambda", build_dir);
     let binary_bootstrap_path = &format!("{}/{}", build_dir, "bootstrap");
     let binary_bootstrap_path_zip =
         &format!("{}/{}", build_dir, "bootstrap.zip");
@@ -420,18 +456,16 @@ fn lambda_exists(name: &str) -> bool {
     .success()
 }
 
-fn deploy_invalidate_cache() {
+fn deploy_python_lambda_function(name: &str) {
     ensure_on_branch(&["dev", "prod"]);
-    ensure_clean("backend/py/invalidate_cache.py");
-    let zip_path = "/tmp/invalidate_cache.py.zip";
+    let py_fname = format!("{}.py", &name.replace("-", "_"));
+    let path = format!("backend/py/{}", py_fname);
+    ensure_clean(&path);
+    let zip_path = format!("/tmp/{}.zip", py_fname);
     let fileb_zip_path = &format!("fileb://{}", zip_path);
-    run_from(
-        "backend/py",
-        "zip",
-        &["-j", zip_path, "invalidate_cache.py"],
-    );
-    let function_name = "motoko-invalidate-cache";
-    if lambda_exists(function_name) {
+    run_from("backend/py/lambdas", "zip", &["-j", &zip_path, &py_fname]);
+    let function_name = format!("motoko-{}", name);
+    if lambda_exists(&function_name) {
         run_from(
             ".",
             "aws",
@@ -439,7 +473,7 @@ fn deploy_invalidate_cache() {
                 "lambda",
                 "update-function-code",
                 "--function-name",
-                function_name,
+                &function_name,
                 "--zip-file",
                 fileb_zip_path,
             ],
@@ -452,9 +486,9 @@ fn deploy_invalidate_cache() {
                 "lambda",
                 "create-function",
                 "--function-name",
-                function_name,
+                &function_name,
                 "--handler",
-                "invalidate_cache.lambda_handler",
+                &format!("{}.lambda_handler", &"name".replace("-", "_")),
                 "--zip-file",
                 fileb_zip_path,
                 "--runtime",
@@ -476,16 +510,21 @@ fn deploy_last_commit() {
     let modified_files =
         &run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
     let frontend = Regex::new("(^|[[:^alpha:]])frontend").unwrap();
-    let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/gql").unwrap();
+    let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/query").unwrap();
     let invalidate_cache =
         Regex::new("(^|[[:^alpha:]])backend/py/invalidate_cache").unwrap();
+    let infer_datatypes =
+        Regex::new("(^|[[:^alpha:]])backend/py/infer_datatypes").unwrap();
     // execute in topological order
     if graphql.is_match(modified_files) {
-        build_graphql();
-        deploy_graphql();
+        build_graphql_lambda();
+        deploy_graphql_lambda();
     }
     if invalidate_cache.is_match(modified_files) {
-        deploy_invalidate_cache();
+        deploy_python_lambda_function("invalidate-cache");
+    }
+    if infer_datatypes.is_match(modified_files) {
+        deploy_python_lambda_function("infer-datatypes");
     }
     if frontend.is_match(modified_files) {
         build_android_apks();
@@ -509,9 +548,9 @@ fn deploy_web() {
 
 fn install(args: &ArgMatches) {
     match args.subcommand() {
-        ("android", _) => install_android(),
-        ("aws", _) => install_aws(),
-        ("ios", _) => install_ios(),
+        Some(("android", _)) => install_android(),
+        Some(("aws", _)) => install_aws(),
+        Some(("ios", _)) => install_ios(),
         _ => quit("invalid install target!"),
     }
 }
@@ -542,21 +581,69 @@ fn install_ios() {
 
 fn run(args: &ArgMatches) {
     match args.subcommand() {
-        ("gql", Some(args)) => gql(args),
-        ("invalidate-cache", _) => invalidate_cache(),
-        ("reset-android-keystore", _) => {
+        Some(("emulator", args)) => emulator(args),
+        Some(("graphql", args)) => graphql(args),
+        Some(("invalidate-cache", _)) => invalidate_cache(),
+        Some(("reset-android-keystore", _)) => {
             reset_android_keystore();
             setup_android_keystore();
         }
-        ("setup-android-keystore", _) => setup_android_keystore(),
-        _ => quit("invalid test target!"),
+        Some(("setup-android-keystore", _)) => setup_android_keystore(),
+        _ => quit("invalid run target!"),
     }
 }
 
-fn gql(args: &ArgMatches) {
+fn emulator(args: &ArgMatches) {
     match args.subcommand() {
-        ("dev", Some(args)) => _gql("https://dev.motoko.ai/graphql", args),
-        ("prod", Some(args)) => _gql("https://motoko.ai/graphql", args),
+        Some(("android", _)) => emulate_android(),
+        Some(("ios", _)) => emulate_ios(),
+        Some(("web", _)) => emulate_web(),
+        _ => quit("invalid emulator!"),
+    }
+}
+
+fn emulate_android() {
+    if !exit_status_from(".", "flutter", &["doctor"]).success() {
+        quit("run `flutter doctor` and resolve issues!");
+    }
+    run_from(
+        ".",
+        "flutter",
+        &["emulators", "--create", "--name", "android"],
+    );
+    run_from(".", "flutter", &["emulators", "--launch", "android"]);
+}
+
+fn emulate_ios() {
+    quit("emulating on iOS is not yet supported!");
+}
+
+fn emulate_web() {
+    run_from("frontend", "flutter", &["channel", "beta"]);
+    run_from("frontend", "flutter", &["upgrade"]);
+    run_from("frontend", "flutter", &["config", "--enable-web"]);
+}
+
+fn graphql(args: &ArgMatches) {
+    match args.subcommand() {
+        Some(("query", args)) => graphql_query(args),
+        Some(("server", _)) => graphql_server(),
+        _ => quit("must specify either 'dev' or 'prod' tier"),
+    }
+}
+
+fn graphql_query(args: &ArgMatches) {
+    match args.subcommand() {
+        Some(("lambda", args)) => graphql_query_lambda(args),
+        Some(("server", args)) => graphql_query_server(args),
+        _ => quit("must specify either 'dev' or 'prod' tier"),
+    }
+}
+
+fn graphql_query_lambda(args: &ArgMatches) {
+    match args.subcommand() {
+        Some(("dev", args)) => _gql("https://dev.motoko.ai/graphql", args),
+        Some(("prod", args)) => _gql("https://motoko.ai/graphql", args),
         _ => quit("must specify either 'dev' or 'prod' tier"),
     }
 }
@@ -577,6 +664,14 @@ fn _gql(endpoint: &str, args: &ArgMatches) {
         }
         _ => quit("must provide a JSON payload"),
     }
+}
+
+fn graphql_query_server(args: &ArgMatches) {
+    _gql("http://localhost:3000", args);
+}
+
+fn graphql_server() {
+    run_from("backend/rs/gql", "cargo", &["run", "--bin", "server"]);
 }
 
 fn reset_android_keystore() {
@@ -698,20 +793,14 @@ fn setup_android_keystore() {
         panic!("unable to create key directory: {}", keystore_dir_str)
     });
     let ks = get_secret("android_keystore", SecretType::Binary);
-    let mut keystore = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(keystore_path)
+    let mut keystore = File::create(keystore_path)
         .unwrap_or_else(|_| panic!("unable to open {}", keystore_path_str));
     keystore.write_all(&ks).unwrap_or_else(|_| {
         panic!("unable to write keystore to {}", keystore_path_str)
     });
     let pw = get_secret("android_keystore_password", SecretType::String);
-    let mut key_properties = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(key_properties_path)
-        .unwrap_or_else(|_| {
+    let mut key_properties =
+        File::create(key_properties_path).unwrap_or_else(|_| {
             panic!("unable to open: {}", key_properties_path_str)
         });
     let key_properties_content = [

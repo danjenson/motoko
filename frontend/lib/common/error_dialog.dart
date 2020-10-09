@@ -4,12 +4,12 @@ Future<void> errorDialog({BuildContext context, String message}) async {
   return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) => ErrorDialog(message: message));
+      builder: (BuildContext context) => ErrorDialog(message));
 }
 
 class ErrorDialog extends StatelessWidget {
   final String message;
-  ErrorDialog({@required this.message});
+  ErrorDialog(this.message);
   @override
   Widget build(BuildContext context) {
     return AlertDialog(

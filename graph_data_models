@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+
+pip install eralchemy psycopg2
+eralchemy -i 'postgresql+psycopg2://motoko:password@127.0.0.1:5432/motoko' -o data_models.png

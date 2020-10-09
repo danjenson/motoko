@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
-import '../../common/profile.dart';
 import 'nav.dart';
 import 'nav_breadcrumb.dart';
 import 'profile_drawer.dart';
@@ -44,9 +43,7 @@ class HomePage extends StatelessWidget {
                     FocusScope.of(context).requestFocus(new FocusNode());
                   },
                   child: nav.body),
-              drawer: Consumer<Profile>(
-                  builder: (context, profile, child) =>
-                      ProfileDrawer(profile: profile)),
+              drawer: ProfileDrawer(),
               bottomNavigationBar: NavBreadcrumb(nav: nav),
               floatingActionButton: nav.add != null
                   ? FloatingActionButton(

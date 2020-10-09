@@ -1,12 +1,6 @@
-#[macro_use]
-extern crate lambda_runtime as lambda;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate log;
-extern crate simple_logger;
-
-use lambda::error::HandlerError;
+use lambda_runtime::{error::HandlerError, lambda, Context};
+use log::error;
+use serde::{Deserialize, Serialize};
 
 use std::error::Error;
 
@@ -30,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn my_handler(
     e: CustomEvent,
-    c: lambda::Context,
+    c: Context,
 ) -> Result<CustomOutput, HandlerError> {
     if e.first_name == "" {
         error!("Empty first name in request {}", c.aws_request_id);

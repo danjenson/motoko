@@ -22,7 +22,14 @@ subcommands:
             - build-image:
                 about: build container image for automated deployment
             - graphql:
-                about: build graphql lambda function
+                about: build graphql
+                settings:
+                    - ArgRequiredElseHelp
+                subcommands:
+                    - lambda:
+                        about: build graphql lambda function
+                    - server:
+                        about: build graphql server
             - ios:
                 about: build iOS
             - web:
@@ -49,6 +56,8 @@ subcommands:
                 about: deploy graphql lambda function
             - ios:
                 about: deploy iOS
+            - infer-datatypes:
+                about: deploy infer-datatypes lambda function
             - invalidate-cache:
                 about: deploy invalidate-cache lambda function
             - last-commit:
@@ -71,15 +80,55 @@ subcommands:
         settings:
             - ArgRequiredElseHelp
         subcommands:
+            - emulator:
+                about: run emulator
+                settings:
+                    - ArgRequiredElseHelp
+                subcommands:
+                    - android:
+                        about: run android emulator
+                    - ios:
+                        about: run ios emulator
+                    - web:
+                        about: run web emulator
+            - graphql:
+                about: run graphql
+                settings:
+                    - ArgRequiredElseHelp
+                subcommands:
+                    - query:
+                        about: query graphql
+                        settings:
+                            - ArgRequiredElseHelp
+                        subcommands:
+                            - lambda:
+                                about: query graphql lambda function
+                                settings:
+                                    - ArgRequiredElseHelp
+                                subcommands:
+                                  - dev:
+                                      about: query graphql on dev
+                                      args:
+                                          - payload:
+                                              about: JSON payload
+                                              required: true
+                                  - prod:
+                                      about: query graphql on prod
+                                      args:
+                                          - payload:
+                                              about: JSON payload
+                                              required: true
+                            - server:
+                                about: query graphql server
+                                args:
+                                    - payload:
+                                        about: JSON payload
+                                        required: true
+                    - server:
+                        about: run local graphql server
+            - invalidate-cache:
+                about: invalidate CloudFront distribution cache
             - reset-android-keystore:
                 about: resets keystore used for signing android apps
             - setup-android-keystore:
                 about: sets up keystore locally for signing android apps
-            - gql:
-                about: run graphql query
-                args:
-                    - payload:
-                        about: JSON payload
-                        required: true
-            - invalidate-cache:
-                about: invalidate CloudFront distribution cache

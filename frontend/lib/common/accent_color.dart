@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'storage.dart';
 
 class AccentColor extends ChangeNotifier {
-  final StorageInterface storage;
-  AccentColor({@required this.storage});
+  final Storage storage;
+  AccentColor(this.storage);
 
   Color _first = Colors.pinkAccent;
   Color _second = Colors.tealAccent;

@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import 'common/accent_color.dart';
 import 'common/auth.dart';
 import 'common/gql.dart';
-import 'common/profile.dart';
 import 'common/storage.dart';
+import 'common/tier.dart';
 import 'common/theme.dart';
 import 'pages/home/home_page.dart';
 import 'pages/login/login_page.dart';
@@ -18,48 +18,49 @@ void main() {
 class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // provide storage
-    return Provider(create: (_) {
-      var storage = Storage();
-      storage.init();
-      return storage;
-    }, child: Consumer<Storage>(builder: (context, storage, _) {
-      // provide accent color
-      return ChangeNotifierProvider(
-          create: (_) {
-            var accentColor = AccentColor(storage: storage);
-            accentColor.init();
-            return accentColor;
-          },
-          child: Consumer<AccentColor>(
-              builder: (context, accentColor, _) => wrapWithGraphQL(MaterialApp(
+    return MultiProvider(
+        providers: [
+          ChangeNotifierProvider<Tier>(create: (_) => Tier()),
+          Provider<Storage>(create: (_) {
+            var storage = Storage();
+            storage.init();
+            return storage;
+          }),
+        ],
+        child: Consumer<Tier>(builder: (context, tier, _) {
+          return Consumer<Storage>(builder: (context, storage, _) {
+            return MultiProvider(
+                providers: [
+                  ChangeNotifierProvider<Auth>(create: (_) {
+                    var auth = Auth(tier, storage);
+                    auth.init();
+                    return auth;
+                  }),
+                  ChangeNotifierProvider<AccentColor>(create: (_) {
+                    var accentColor = AccentColor(storage);
+                    accentColor.init();
+                    return accentColor;
+                  }),
+                ],
+                child: GraphQL(
+                    Consumer<AccentColor>(builder: (context, accentColor, _) {
+                  return MaterialApp(
                     title: 'motoko',
                     initialRoute: '/',
                     routes: {
-                      '/': (context) => MultiProvider(
-                            providers: [
-                              // provide auth
-                              ChangeNotifierProvider<Auth>(create: (_) {
-                                var auth = Auth(storage: storage);
-                                auth.init();
-                                return auth;
-                              }),
-                              // provide profile
-                              ChangeNotifierProvider<Profile>(
-                                  create: (_) => Profile()),
-                            ],
-                            child: LandingPage(),
-                          ),
+                      '/': (context) => CurrentPage(),
                       '/privacy': (context) => PrivacyPage(),
                     },
                     themeMode: ThemeMode.dark,
                     darkTheme: theme(accentColor.value),
-                  ))));
-    }));
+                  );
+                })));
+          });
+        }));
   }
 }
 
-class LandingPage extends StatelessWidget {
+class CurrentPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<Auth>(builder: (context, Auth auth, _) {

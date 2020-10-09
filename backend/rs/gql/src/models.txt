@@ -1,0 +1,210 @@
+how to do subscriptions? should task status be in the table it is stored in?
+how will we manage tasks?
+
+type User {
+  id: ID!
+  displayName: String!
+  name: String!
+  email: String!
+  projects: [Project!]!
+}
+
+// TODO: __typename still needed?
+// loading screen
+query user {
+  user {
+    id
+    displayName
+    name
+    email
+    projects {
+      id
+      name
+    }
+  }
+}
+
+type Project {
+  id: ID!
+  datasets: [Dataview!]!
+  analyses: [Analysis!]!
+  userRoles: [ProjectUserRole!]!
+}
+
+// TODO: how will these be cached? -> by query?
+query datasets(projectID: ID!) -> Connection {
+  id 
+  name
+}
+
+query analyses(projectID: ID!) -> Connection {
+  id
+  name
+}
+
+query userRoles(projectID: ID!) -> Connection {
+  id
+  user {
+    name
+  }
+  role
+}
+
+// NOTE: if the parent is self, this is a root dataset, and the operation
+// should be Operation::Create
+type Dataview {
+  id: ID!
+  name: String!
+  parent: Dataview!
+  operation: Operation!
+  schema: JSONString!
+  rows: Connection<Row>
+  statistics: [Statistic!]!
+  plots: [Plot!]!
+  models: [Model!]!
+}
+
+
+query rows(dataviewID: ID!) -> Connection {
+  __typename
+  // TODO return list of rows
+}
+
+query statistics(dataviewID: ID!) -> Connection {
+  __typename
+  id
+  name
+  params
+  value
+}
+
+query plots(dataviewID: ID!) -> Connection {
+  __typename
+  id
+  name
+  params
+  uri
+}
+
+query models(dataviewID: ID!) -> Connection {
+  __typename
+  id
+  name
+  target
+  features
+  evaluation
+  decisions
+}
+
+type Analysis {
+  id: ID!
+  name: String!
+  dataview: Dataview!
+  stack: [Dataview!]!
+}
+
+// data view
+query stack(analysisID: ID!) -> Connection {
+  __typename
+  id
+  operation
+}
+
+type Statistic {
+  id: ID!
+  dataview: Dataview!
+  stat: Stat
+  value: String!
+}
+
+type Stat = Mean(String!) | Mode(String!) | Median(String!) | ANOVA(Params!)
+
+type Mean.. {
+  id: ID!
+}
+
+type Plot {
+  id: ID!
+  name: String!
+  dataview: Dataview!
+  params: ScatterPlotParams | LinePlotParams | SmoothedLinePlotParams | HistogramPlotParams
+  uri: URI!
+}
+
+type ScatterPlotParams {
+  x: String!
+  y: String!
+  color: String
+  size: String
+  shape: String
+}
+
+type LinePlotParams {
+  x: String!
+  y: String!
+  thickness: Int
+  color: String
+  withDots: Bool
+  size: String
+  shape: String
+}
+
+type SmoothedLinePlotParams {
+  x: String!
+  y: String!
+  thickness: Int
+  color: String
+  withDots: Bool
+  size: String
+  shape: String
+}
+
+type HistogramPlotParams {
+  x: String!
+  y: String
+  nBins: Int
+}
+
+type ProjectUserRole {
+  projectID: ID!
+  userID: ID!
+  role: Role!
+}
+
+// <model>:
+//  Params:
+//    target
+//    features
+//  Decisions:
+//    decisions
+//  Evaluation:
+//    evaluation
+
+type Model {
+  id: ID!
+  name: String!
+  dataview: Dataview!
+  target: String
+  features: [String!]!
+  transformerURI: URI!
+  estimatorURI: URI!
+  evaluation: Evaluation
+  decisions: [Decision!]!
+}
+
+type Evaluation = ClassifyEvaluation | RegressEvaluation | ClusterEvaluation
+
+type Task {
+  status: Queued | InProgress | Succeeded | Failed
+  resultID: ID!
+}
+
+mutation uploadFromURI(projectID: ID!, name: String!, uri: String!) -> TaskID
+mutation uploadToURI(projectID: ID!, name: String!) -> URI
+mutation removeProjectUserRole(projectID: ID!, userName: String!)
+mutation setProjectUserRole(projectID: ID!, userName: String!, role: Role!)
+// TODO: link existing stats/plots/models?
+mutation transform(dataviewID: ID!, operation: Operation)
+mutation calculate(dataviewID: ID!, name: String!, stat: Stat!)
+mutation plot(dataviewID: ID!, name: String!, params: PlotParams!)
+mutation train(dataviewID: ID!, name: String!, features: [String!]!, target: String)

@@ -13,3 +13,7 @@ bool isDark(BuildContext context) {
   final Brightness brightnessValue = MediaQuery.of(context).platformBrightness;
   return brightnessValue == Brightness.dark;
 }
+
+int timestamp() {
+  return DateTime.now().millisecondsSinceEpoch ~/ 1000;
+}

@@ -13,6 +13,7 @@ class Storage implements StorageInterface {
   Future<bool> putBool({String key, bool value}) =>
       _storage.putBool(key: key, value: value);
   Future<bool> getBool(String key) => _storage.getBool(key);
+  Future<bool> delete(String key) => _storage.delete(key);
   Future<bool> clear() => _storage.clear();
 }
 
@@ -23,6 +24,7 @@ abstract class StorageInterface {
   Future<String> getString(String key);
   Future<bool> putBool({String key, bool value});
   Future<bool> getBool(String key);
+  Future<bool> delete(String key);
   Future<void> clear();
 }
 
@@ -59,6 +61,8 @@ class WebStorage implements StorageInterface {
     }
   }
 
+  Future<bool> delete(String key) async => _storage.remove(key);
+
   Future<bool> clear() async => _storage.clear();
 }
 
@@ -87,6 +91,11 @@ class MobileStorage implements StorageInterface {
   Future<bool> getBool(String key) async {
     var v = await _storage.read(key: key);
     return v == 'true';
+  }
+
+  Future<bool> delete(String key) async {
+    await _storage.delete(key: key);
+    return true;
   }
 
   Future<bool> clear() async {

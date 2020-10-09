@@ -1,0 +1,2 @@
+./reset.sh
+cargo test
