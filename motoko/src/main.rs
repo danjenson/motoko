@@ -201,10 +201,7 @@ fn build_android_bundle() {
 }
 
 fn build_build_image() {
-    run_from("motoko", "cargo", &["build", "--release"]);
-    run_from(".", "cp", &["motoko/target/release/motoko", "build_image"]);
     run_from("build_image", "docker", &["build", "-t", "motoko", "."]);
-    run_from(".", "rm", &["build_image/motoko"]);
 }
 
 fn build_graphql(args: &ArgMatches) {
@@ -270,7 +267,7 @@ fn deploy(args: &ArgMatches) {
         Some(("build-image", _)) => deploy_build_image(),
         Some(("graphql", _)) => deploy_graphql_lambda(),
         Some(("ios", _)) => deploy_ios(),
-        Some(("infer_datatypes", _)) => {
+        Some(("infer-datatypes", _)) => {
             deploy_python_lambda_function("infer-datatypes")
         }
         Some(("invalidate-cache", _)) => {
@@ -319,6 +316,28 @@ fn deploy_android_apks() {
         ],
     );
     invalidate_cache();
+}
+
+fn infer_datatypes(args: &ArgMatches) {
+    let output_file = "/tmp/infer-datatypes.json";
+    run_from(
+        ".",
+        "aws",
+        &[
+            "lambda",
+            "invoke",
+            "--cli-binary-format",
+            "raw-in-base64-out",
+            "--function-name",
+            "motoko-infer-datatypes",
+            "--payload",
+            &format!("{{ \"uri\": \"{}\" }}", args.value_of("uri").unwrap()),
+            output_file,
+        ],
+    );
+    let output = std::fs::read_to_string(output_file).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+    println!("{:?}", value);
 }
 
 fn invalidate_cache() {
@@ -463,7 +482,7 @@ fn deploy_python_lambda_function(name: &str) {
     ensure_clean(&path);
     let zip_path = format!("/tmp/{}.zip", py_fname);
     let fileb_zip_path = &format!("fileb://{}", zip_path);
-    run_from("backend/py/lambdas", "zip", &["-j", &zip_path, &py_fname]);
+    run_from("backend/py", "zip", &["-j", &zip_path, &py_fname]);
     let function_name = format!("motoko-{}", name);
     if lambda_exists(&function_name) {
         run_from(
@@ -583,6 +602,7 @@ fn run(args: &ArgMatches) {
     match args.subcommand() {
         Some(("emulator", args)) => emulator(args),
         Some(("graphql", args)) => graphql(args),
+        Some(("infer-datatypes", args)) => infer_datatypes(args),
         Some(("invalidate-cache", _)) => invalidate_cache(),
         Some(("reset-android-keystore", _)) => {
             reset_android_keystore();

@@ -116,12 +116,6 @@
         every auto-generation
 
 ## Deployment
-- if the build script changes, i.e. the `motoko` command, the build image will
-  need to be redeployed, since that binary is added to the image and used to
-  orchestrate builds; to update the build image:
-  - `./install_motoko_command`
-  - `motoko build build-image`
-  - `motoko deploy build-image`
 - automatic deployment for the `dev` and `prod` branches is setup for every
   push using [AWS CodeBuild](https://docs.aws.amazon.com/codebuild/latest/userguide/sample-ecr.html)
   - the [custom build image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)

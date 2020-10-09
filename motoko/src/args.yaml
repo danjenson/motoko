@@ -126,6 +126,12 @@ subcommands:
                                         required: true
                     - server:
                         about: run local graphql server
+            - infer-datatypes:
+                about: infer data types using cloud function
+                args:
+                    - uri:
+                        about: URI of a dataset
+                        required: true
             - invalidate-cache:
                 about: invalidate CloudFront distribution cache
             - reset-android-keystore:

@@ -3,4 +3,5 @@ phases:
   build:
     commands:
       - git checkout prod
+      - ./install_motoko_command
       - motoko deploy all
