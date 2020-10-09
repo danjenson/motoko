@@ -6,8 +6,8 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.32"
-async-graphql = "2.0.0-alpha.14"
-async-graphql-tide = "2.0.0-alpha.14"
+async-graphql = "2.0.0-alpha.23"
+async-graphql-tide = "2.0.0-alpha.23"
 async-std = { version = "1.6.4", features = ["attributes"] }
 base64 = "0.12.3"
 chrono = "0.4.19"
