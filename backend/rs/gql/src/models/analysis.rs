@@ -3,11 +3,11 @@ use crate::{
     models::{dataset::Dataset, dataview::Dataview, project_user_role::Role},
     utils::get_data,
 };
-use async_graphql::{Context, FieldResult, ID};
+use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Result};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, FromRow)]
@@ -25,7 +25,7 @@ impl Analysis {
         pool: &Pool,
         dataset_uuid: &Uuid,
         name: &str,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             WITH dv AS (
@@ -46,14 +46,18 @@ impl Analysis {
         .await
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> Result<Self> {
+    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM analyses WHERE uuid = $1")
             .bind(uuid)
             .fetch_one(pool)
             .await
     }
 
-    pub async fn rename(pool: &Pool, uuid: &Uuid, name: &str) -> Result<Self> {
+    pub async fn rename(
+        pool: &Pool,
+        uuid: &Uuid,
+        name: &str,
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE analyses
@@ -72,7 +76,7 @@ impl Analysis {
         pool: &Pool,
         uuid: &Uuid,
         user_uuid: &Uuid,
-    ) -> Result<Role> {
+    ) -> SQLxResult<Role> {
         // TODO(danj): update once sqlx allows enums to derive FromRow
         let row: (Role,) = query_as(
             r#"
@@ -97,7 +101,7 @@ impl Analysis {
         pool: &Pool,
         uuid: &Uuid,
         dataview_uuid: &Uuid,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE analyses
@@ -112,7 +116,7 @@ impl Analysis {
         .await
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> Result<()> {
+    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM datasets WHERE uuid = $1")
             .bind(uuid)
             .execute(pool)
@@ -124,29 +128,29 @@ impl Analysis {
 #[node(uuid)]
 #[async_graphql::Object]
 impl Analysis {
-    pub async fn created_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn created_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.created_at)
     }
 
-    pub async fn updated_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn updated_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.updated_at)
     }
 
-    pub async fn dataset(&self, ctx: &Context<'_>) -> FieldResult<Dataset> {
+    pub async fn dataset(&self, ctx: &Context<'_>) -> GQLResult<Dataset> {
         let d = get_data(ctx)?;
         Dataset::get(&d.pool, &self.dataset_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn dataview(&self, ctx: &Context<'_>) -> FieldResult<Dataview> {
+    pub async fn dataview(&self, ctx: &Context<'_>) -> GQLResult<Dataview> {
         let d = get_data(ctx)?;
         Dataview::get(&d.pool, &self.dataview_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn name(&self) -> FieldResult<&str> {
+    pub async fn name(&self) -> GQLResult<&String> {
         Ok(&self.name)
     }
 }

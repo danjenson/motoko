@@ -1,6 +1,8 @@
 use lambda_runtime::{error::HandlerError, lambda, Context};
 use log::error;
+use log::LevelFilter;
 use serde::{Deserialize, Serialize};
+use simple_logger::SimpleLogger;
 
 use std::error::Error;
 
@@ -16,7 +18,7 @@ struct CustomOutput {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    simple_logger::init_with_level(log::Level::Info)?;
+    SimpleLogger::new().with_level(LevelFilter::Info).init()?;
     lambda!(my_handler);
 
     Ok(())

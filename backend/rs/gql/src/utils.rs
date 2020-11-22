@@ -1,13 +1,13 @@
 use crate::{context_data::ContextData, models::user::User};
-use async_graphql::{Context, FieldResult, ID};
+use async_graphql::{Context, Result, ID};
 use std::str;
 use uuid::Uuid;
 
-pub fn get_data<'a>(ctx: &'a Context<'_>) -> FieldResult<&'a ContextData> {
+pub fn get_data<'a>(ctx: &'a Context<'_>) -> Result<&'a ContextData> {
     ctx.data::<ContextData>()
 }
 
-pub fn current_user<'a>(context: &'a Context<'_>) -> FieldResult<&'a User> {
+pub fn current_user<'a>(context: &'a Context<'_>) -> Result<&'a User> {
     let d = context.data::<ContextData>()?;
     match &d.user {
         Some(user) => Ok(user),
@@ -15,7 +15,7 @@ pub fn current_user<'a>(context: &'a Context<'_>) -> FieldResult<&'a User> {
     }
 }
 
-pub fn is_current_user(user: &User, context: &Context<'_>) -> FieldResult<()> {
+pub fn is_current_user(user: &User, context: &Context<'_>) -> Result<()> {
     let curr_user = current_user(context)?;
     if curr_user.uuid != user.uuid {
         Err("invalid permissions".into())

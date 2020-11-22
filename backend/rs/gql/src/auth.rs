@@ -1,5 +1,5 @@
 use crate::models::user::User;
-use async_graphql::{Enum, FieldError, FieldResult, SimpleObject};
+use async_graphql::{Enum, Error, Result, SimpleObject};
 use chrono::{DateTime, Duration, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -55,7 +55,7 @@ pub struct OAuth2User {
 pub fn credentials_for_user(
     jwt_secret: &str,
     user: &User,
-) -> FieldResult<Credentials> {
+) -> Result<Credentials> {
     use jsonwebtoken::{encode, EncodingKey, Header};
     let header = Header::default();
     let key = EncodingKey::from_secret(&jwt_secret.as_bytes());
@@ -69,7 +69,7 @@ pub fn credentials_for_user(
         },
         &key,
     )
-    .map_err(|e| FieldError(format!("{:?}", e), None))?;
+    .map_err(|e| -> Error { e.into() })?;
     let refresh_token = encode(
         &header,
         &Claims {
@@ -78,7 +78,7 @@ pub fn credentials_for_user(
         },
         &key,
     )
-    .map_err(|e| FieldError(format!("{:?}", e), None))?;
+    .map_err(|e| -> Error { e.into() })?;
     Ok(Credentials {
         access_token,
         access_token_expires_at,
@@ -97,10 +97,7 @@ pub fn extract_bearer_token(authorization_header: &str) -> Option<String> {
     })
 }
 
-pub fn user_uuid_from_token(
-    jwt_secret: &str,
-    token: &str,
-) -> FieldResult<Uuid> {
+pub fn user_uuid_from_token(jwt_secret: &str, token: &str) -> Result<Uuid> {
     use jsonwebtoken::{decode, DecodingKey, Validation};
     decode::<Claims>(
         &token,
@@ -108,14 +105,14 @@ pub fn user_uuid_from_token(
         &Validation::default(),
     )
     .map(|token_data| token_data.claims.sub)
-    .map_err(|e| FieldError(format!("{:?}", e), None))
+    .map_err(|e| -> Error { e.into() })
 }
 
 // https://developers.google.com/identity/protocols/oauth2/openid-connect#validatinganidtoken
 pub async fn validate_google_id_token(
     google_oauth2_client_id: &str,
     token: &str,
-) -> FieldResult<OAuth2User> {
+) -> Result<OAuth2User> {
     static INVALID_MSG: &str = "Invalid ID Token";
     // hitting the tokeninfo endpoint will decrypt the token if it is signed with valid google
     // credentials; an alternative would be to download the credentials, since they are rotated

@@ -6,7 +6,7 @@ use crate::{
     node::{id_to_node, Node},
     utils::{current_user, get_data, graphql_id_to_db_keys},
 };
-use async_graphql::{Context, FieldResult, ID};
+use async_graphql::{Context, Result, ID};
 use sqlx::query_as;
 
 #[derive(Debug)]
@@ -14,11 +14,11 @@ pub struct QueryRoot;
 
 #[async_graphql::Object]
 impl QueryRoot {
-    async fn me<'a>(&'a self, ctx: &'a Context<'_>) -> FieldResult<&'a User> {
+    async fn me<'a>(&'a self, ctx: &'a Context<'_>) -> Result<&'a User> {
         current_user(ctx)
     }
 
-    async fn node(&self, ctx: &Context<'_>, id: ID) -> FieldResult<Node> {
+    async fn node(&self, ctx: &Context<'_>, id: ID) -> Result<Node> {
         let d = get_data(ctx)?;
         id_to_node(&d.pool, id).await
     }
@@ -27,7 +27,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> FieldResult<Vec<Dataset>> {
+    ) -> Result<Vec<Dataset>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -55,7 +55,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> FieldResult<Vec<Analysis>> {
+    ) -> Result<Vec<Analysis>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -83,7 +83,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> FieldResult<Vec<Dataset>> {
+    ) -> Result<Vec<Dataset>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -109,7 +109,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> FieldResult<Vec<Dataview>> {
+    ) -> Result<Vec<Dataview>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(analysis_id);
@@ -146,7 +146,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> FieldResult<Vec<Plot>> {
+    ) -> Result<Vec<Plot>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(analysis_id);
@@ -173,7 +173,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> FieldResult<Vec<Statistic>> {
+    ) -> Result<Vec<Statistic>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(analysis_id);
@@ -200,7 +200,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> FieldResult<Vec<Model>> {
+    ) -> Result<Vec<Model>> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(analysis_id);

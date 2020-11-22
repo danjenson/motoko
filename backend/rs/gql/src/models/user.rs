@@ -3,11 +3,11 @@ use crate::{
     models::{project::Project, user_refresh_token::UserRefreshToken},
     utils::{get_data, is_current_user},
 };
-use async_graphql::{Context, FieldResult, ID};
+use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Result};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, FromRow)]
@@ -26,7 +26,7 @@ impl User {
         display_name: &str,
         name: &str,
         email: &str,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             INSERT INTO users (display_name, name, email)
@@ -40,28 +40,32 @@ impl User {
         .await
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> Result<Self> {
+    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM users WHERE uuid = $1")
             .bind(uuid)
             .fetch_one(pool)
             .await
     }
 
-    pub async fn get_by_email(pool: &Pool, email: &str) -> Result<Self> {
+    pub async fn get_by_email(pool: &Pool, email: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM users WHERE email = $1")
             .bind(email)
             .fetch_one(pool)
             .await
     }
 
-    pub async fn get_by_name(pool: &Pool, name: &str) -> Result<Self> {
+    pub async fn get_by_name(pool: &Pool, name: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM users WHERE name = $1")
             .bind(name)
             .fetch_one(pool)
             .await
     }
 
-    pub async fn rename(pool: &Pool, uuid: &Uuid, name: &str) -> Result<Self> {
+    pub async fn rename(
+        pool: &Pool,
+        uuid: &Uuid,
+        name: &str,
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE users
@@ -76,7 +80,7 @@ impl User {
         .await
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> Result<()> {
+    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM users WHERE uuid = $1")
             .bind(uuid)
             .execute(pool)
@@ -91,7 +95,7 @@ impl User {
     pub async fn created_at(
         &self,
         ctx: &Context<'_>,
-    ) -> FieldResult<DateTime<Utc>> {
+    ) -> GQLResult<DateTime<Utc>> {
         is_current_user(self, ctx)?;
         Ok(self.created_at)
     }
@@ -99,27 +103,24 @@ impl User {
     pub async fn updated_at(
         &self,
         ctx: &Context<'_>,
-    ) -> FieldResult<DateTime<Utc>> {
+    ) -> GQLResult<DateTime<Utc>> {
         is_current_user(self, ctx)?;
         Ok(self.updated_at)
     }
 
-    pub async fn display_name(&self) -> FieldResult<&str> {
+    pub async fn display_name(&self) -> GQLResult<&String> {
         Ok(&self.display_name)
     }
 
-    pub async fn name(&self) -> FieldResult<&str> {
+    pub async fn name(&self) -> GQLResult<&String> {
         Ok(&self.name)
     }
 
-    pub async fn email(&self) -> FieldResult<&str> {
+    pub async fn email(&self) -> GQLResult<&String> {
         Ok(&self.email)
     }
 
-    pub async fn projects(
-        &self,
-        ctx: &Context<'_>,
-    ) -> FieldResult<Vec<Project>> {
+    pub async fn projects(&self, ctx: &Context<'_>) -> GQLResult<Vec<Project>> {
         is_current_user(self, ctx)?;
         let d = get_data(ctx)?;
         query_as(
@@ -140,7 +141,7 @@ impl User {
     pub async fn refresh_tokens(
         &self,
         ctx: &Context<'_>,
-    ) -> FieldResult<Vec<UserRefreshToken>> {
+    ) -> GQLResult<Vec<UserRefreshToken>> {
         is_current_user(self, ctx)?;
         let d = get_data(ctx)?;
         query_as("SELECT * FROM user_refresh_tokens WHERE user_uuid = $1")

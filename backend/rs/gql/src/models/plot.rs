@@ -3,12 +3,12 @@ use crate::{
     models::{dataview::Dataview, project_user_role::Role, status::Status},
     utils::get_data,
 };
-use async_graphql::{Context, Enum, FieldResult, ID};
+use async_graphql::{Context, Enum, Json as GQLJson, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
-use sqlx::{query, query_as, FromRow, Result};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult};
 use uuid::Uuid;
 
 #[derive(
@@ -45,7 +45,7 @@ impl Plot {
         name: &str,
         type_: &Type,
         args: &Json,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             INSERT INTO plots (dataview_uuid, name, type, args)
@@ -60,7 +60,7 @@ impl Plot {
         .await
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> Result<Self> {
+    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
         query_as(
             r#"
             SELECT
@@ -81,7 +81,11 @@ impl Plot {
         .await
     }
 
-    pub async fn rename(pool: &Pool, uuid: &Uuid, name: &str) -> Result<Self> {
+    pub async fn rename(
+        pool: &Pool,
+        uuid: &Uuid,
+        name: &str,
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE plots
@@ -100,7 +104,7 @@ impl Plot {
         pool: &Pool,
         uuid: &Uuid,
         user_uuid: &Uuid,
-    ) -> Result<Role> {
+    ) -> SQLxResult<Role> {
         // TODO(danj): update once sqlx allows enums to derive FromRow
         let row: (Role,) = query_as(
             r#"
@@ -125,7 +129,7 @@ impl Plot {
         Ok(row.0)
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> Result<()> {
+    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM plots WHERE uuid = $1")
             .bind(uuid)
             .execute(pool)
@@ -137,39 +141,39 @@ impl Plot {
 #[node(uuid)]
 #[async_graphql::Object]
 impl Plot {
-    pub async fn created_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn created_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.created_at)
     }
 
-    pub async fn updated_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn updated_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.updated_at)
     }
 
-    pub async fn dataview(&self, ctx: &Context<'_>) -> FieldResult<Dataview> {
+    pub async fn dataview(&self, ctx: &Context<'_>) -> GQLResult<Dataview> {
         let d = get_data(ctx)?;
         Dataview::get(&d.pool, &self.dataview_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn name(&self) -> FieldResult<&str> {
+    pub async fn name(&self) -> GQLResult<&String> {
         Ok(&self.name)
     }
 
-    #[field(name = "type")]
-    pub async fn type_(&self) -> FieldResult<&Type> {
+    #[graphql(name = "type")]
+    pub async fn type_(&self) -> GQLResult<&Type> {
         Ok(&self.type_)
     }
 
-    pub async fn args(&self) -> FieldResult<&str> {
-        Ok(&self.args.as_str().unwrap())
+    pub async fn args(&self) -> GQLResult<GQLJson<Json>> {
+        Ok(GQLJson(self.args.to_owned()))
     }
 
-    pub async fn status(&self) -> FieldResult<&Status> {
+    pub async fn status(&self) -> GQLResult<&Status> {
         Ok(&self.status)
     }
 
-    pub async fn uri(&self) -> FieldResult<&Option<String>> {
+    pub async fn uri(&self) -> GQLResult<&Option<String>> {
         Ok(&self.uri)
     }
 }

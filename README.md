@@ -31,6 +31,11 @@
 - motoko pypi sdk
 - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
+## Product
+- Marketplace for canned analyses?
+- Data adapters?
+- Tools like hedonometer
+
 ## Local Setup
 
 #### General

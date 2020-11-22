@@ -3,12 +3,12 @@ use crate::{
     models::{analysis::Analysis, project_user_role::Role, status::Status},
     utils::get_data,
 };
-use async_graphql::{Context, Enum, FieldResult, ID};
+use async_graphql::{Context, Enum, Json as GQLJson, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
-use sqlx::{query, query_as, FromRow, Result, Type};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult, Type};
 use uuid::Uuid;
 
 #[derive(
@@ -43,7 +43,7 @@ impl Dataview {
         dataview_uuid: &Uuid,
         operation: &Operation,
         args: &Json,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             INSERT INTO dataviews (
@@ -65,7 +65,7 @@ impl Dataview {
         .await
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> Result<Self> {
+    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM dataviews WHERE uuid = $1")
             .bind(uuid)
             .fetch_one(pool)
@@ -76,7 +76,7 @@ impl Dataview {
         pool: &Pool,
         uuid: &Uuid,
         user_uuid: &Uuid,
-    ) -> Result<Role> {
+    ) -> SQLxResult<Role> {
         // TODO(danj): update once sqlx allows enums to derive FromRow
         let row: (Role,) = query_as(
             r#"
@@ -99,7 +99,7 @@ impl Dataview {
         Ok(row.0)
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> Result<()> {
+    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM dataviews WHERE uuid = $1")
             .bind(uuid)
             .execute(pool)
@@ -111,37 +111,37 @@ impl Dataview {
 #[node(uuid)]
 #[async_graphql::Object]
 impl Dataview {
-    pub async fn created_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn created_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.created_at)
     }
 
-    pub async fn updated_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn updated_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.updated_at)
     }
 
-    pub async fn analysis(&self, ctx: &Context<'_>) -> FieldResult<Analysis> {
+    pub async fn analysis(&self, ctx: &Context<'_>) -> GQLResult<Analysis> {
         let d = get_data(ctx)?;
         Analysis::get(&d.pool, &self.analysis_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn parent(&self, ctx: &Context<'_>) -> FieldResult<Self> {
+    pub async fn parent(&self, ctx: &Context<'_>) -> GQLResult<Self> {
         let d = get_data(ctx)?;
         Self::get(&d.pool, &self.parent_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn operation(&self) -> FieldResult<&Operation> {
+    pub async fn operation(&self) -> GQLResult<&Operation> {
         Ok(&self.operation)
     }
 
-    pub async fn args(&self) -> FieldResult<Option<String>> {
-        Ok(self.args.clone().map(|v| v.to_string()))
+    pub async fn args(&self) -> GQLResult<Option<GQLJson<Json>>> {
+        Ok(self.args.to_owned().map(|v| GQLJson(v)))
     }
 
-    pub async fn status(&self) -> FieldResult<&Status> {
+    pub async fn status(&self) -> GQLResult<&Status> {
         Ok(&self.status)
     }
 }

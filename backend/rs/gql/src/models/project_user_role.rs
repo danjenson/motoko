@@ -3,11 +3,11 @@ use crate::{
     models::{project::Project, user::User},
     utils::get_data,
 };
-use async_graphql::{Context, Enum, FieldResult, ID};
+use async_graphql::{Context, Enum, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Result, Type};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult, Type};
 use uuid::Uuid;
 
 #[derive(
@@ -36,7 +36,7 @@ impl ProjectUserRole {
         project_uuid: &Uuid,
         user_uuid: &Uuid,
         role: &Role,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             INSERT INTO project_user_roles (project_uuid, user_uuid, role)
@@ -54,7 +54,7 @@ impl ProjectUserRole {
         pool: &Pool,
         project_uuid: &Uuid,
         user_uuid: &Uuid,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             SELECT *
@@ -74,7 +74,7 @@ impl ProjectUserRole {
         project_uuid: &Uuid,
         user_uuid: &Uuid,
         role: &Role,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE project_user_roles
@@ -94,7 +94,7 @@ impl ProjectUserRole {
     pub async fn by_project(
         pool: &Pool,
         project_uuid: &Uuid,
-    ) -> Result<Vec<Self>> {
+    ) -> SQLxResult<Vec<Self>> {
         query_as(
             r#"
             SELECT *
@@ -107,7 +107,10 @@ impl ProjectUserRole {
         .await
     }
 
-    pub async fn by_user(pool: &Pool, user_uuid: &Uuid) -> Result<Vec<Self>> {
+    pub async fn by_user(
+        pool: &Pool,
+        user_uuid: &Uuid,
+    ) -> SQLxResult<Vec<Self>> {
         query_as(
             r#"
             SELECT *
@@ -124,7 +127,7 @@ impl ProjectUserRole {
         pool: &Pool,
         project_uuid: &Uuid,
         user_uuid: &Uuid,
-    ) -> Result<()> {
+    ) -> SQLxResult<()> {
         query(
             r#"
             DELETE FROM project_user_roles
@@ -143,29 +146,29 @@ impl ProjectUserRole {
 #[node(project_uuid, user_uuid)]
 #[async_graphql::Object]
 impl ProjectUserRole {
-    pub async fn created_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn created_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.created_at)
     }
 
-    pub async fn updated_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn updated_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.updated_at)
     }
 
-    pub async fn project(&self, ctx: &Context<'_>) -> FieldResult<Project> {
+    pub async fn project(&self, ctx: &Context<'_>) -> GQLResult<Project> {
         let d = get_data(ctx)?;
         Project::get(&d.pool, &self.project_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn user(&self, ctx: &Context<'_>) -> FieldResult<User> {
+    pub async fn user(&self, ctx: &Context<'_>) -> GQLResult<User> {
         let d = get_data(ctx)?;
         User::get(&d.pool, &self.user_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn role(&self) -> FieldResult<&Role> {
+    pub async fn role(&self) -> GQLResult<&Role> {
         Ok(&self.role)
     }
 }

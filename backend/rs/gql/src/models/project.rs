@@ -7,11 +7,11 @@ use crate::{
     },
     utils::get_data,
 };
-use async_graphql::{Context, FieldResult, ID};
+use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Result};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, FromRow)]
@@ -27,7 +27,7 @@ impl Project {
         pool: &Pool,
         name: &str,
         user_uuid: &Uuid,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         let mut tx = pool.begin().await?;
         let project: Self =
             query_as("INSERT INTO projects (name) VALUES ($1) RETURNING *")
@@ -49,14 +49,18 @@ impl Project {
         Ok(project)
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> Result<Self> {
+    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM projects WHERE uuid = $1")
             .bind(uuid)
             .fetch_one(pool)
             .await
     }
 
-    pub async fn rename(pool: &Pool, uuid: &Uuid, name: &str) -> Result<Self> {
+    pub async fn rename(
+        pool: &Pool,
+        uuid: &Uuid,
+        name: &str,
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE projects
@@ -71,7 +75,7 @@ impl Project {
         .await
     }
 
-    pub async fn make_public(pool: &Pool, uuid: &Uuid) -> Result<Self> {
+    pub async fn make_public(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE projects
@@ -85,7 +89,7 @@ impl Project {
         .await
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> Result<()> {
+    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM projects WHERE uuid = $1")
             .bind(uuid)
             .execute(pool)
@@ -97,22 +101,19 @@ impl Project {
 #[node(uuid)]
 #[async_graphql::Object]
 impl Project {
-    pub async fn created_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn created_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.created_at)
     }
 
-    pub async fn updated_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn updated_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.updated_at)
     }
 
-    pub async fn name(&self) -> FieldResult<&str> {
+    pub async fn name(&self) -> GQLResult<&String> {
         Ok(&self.name)
     }
 
-    pub async fn datasets(
-        &self,
-        ctx: &Context<'_>,
-    ) -> FieldResult<Vec<Dataset>> {
+    pub async fn datasets(&self, ctx: &Context<'_>) -> GQLResult<Vec<Dataset>> {
         let d = get_data(ctx)?;
         query_as("SELECT * FROM datasets WHERE project_uuid = $1")
             .bind(self.uuid)
@@ -124,7 +125,7 @@ impl Project {
     pub async fn analyses(
         &self,
         ctx: &Context<'_>,
-    ) -> FieldResult<Vec<Analysis>> {
+    ) -> GQLResult<Vec<Analysis>> {
         let d = get_data(ctx)?;
         query_as("SELECT * FROM analyses WHERE project_uuid = $1")
             .bind(self.uuid)
@@ -136,7 +137,7 @@ impl Project {
     pub async fn roles(
         &self,
         ctx: &Context<'_>,
-    ) -> FieldResult<Vec<ProjectUserRole>> {
+    ) -> GQLResult<Vec<ProjectUserRole>> {
         let d = get_data(ctx)?;
         query_as("SELECT * FROM project_user_roles WHERE project_uuid = $1")
             .bind(self.uuid)

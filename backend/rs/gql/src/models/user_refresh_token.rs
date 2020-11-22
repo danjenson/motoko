@@ -1,9 +1,9 @@
 use crate::{db::Pool, models::user::User, utils::get_data};
-use async_graphql::{Context, FieldResult, ID};
+use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Result};
+use sqlx::{query, query_as, FromRow, Result as SQLxResult};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, FromRow)]
@@ -19,7 +19,7 @@ impl UserRefreshToken {
         user_uuid: &Uuid,
         value: &str,
         expires_at: &DateTime<Utc>,
-    ) -> Result<Self> {
+    ) -> SQLxResult<Self> {
         query_as(
             r#"
             INSERT INTO user_refresh_tokens (user_uuid, value, expires_at)
@@ -33,14 +33,14 @@ impl UserRefreshToken {
         .await
     }
 
-    pub async fn get(pool: &Pool, value: &str) -> Result<Self> {
+    pub async fn get(pool: &Pool, value: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM user_refresh_tokens WHERE value = $1")
             .bind(value)
             .fetch_one(pool)
             .await
     }
 
-    pub async fn delete(&self, pool: &Pool) -> Result<()> {
+    pub async fn delete(&self, pool: &Pool) -> SQLxResult<()> {
         query("DELETE FROM user_refresh_tokens WHERE value = $1")
             .bind(&self.value)
             .execute(pool)
@@ -52,18 +52,18 @@ impl UserRefreshToken {
 #[node(value)]
 #[async_graphql::Object]
 impl UserRefreshToken {
-    pub async fn user(&self, ctx: &Context<'_>) -> FieldResult<User> {
+    pub async fn user(&self, ctx: &Context<'_>) -> GQLResult<User> {
         let d = get_data(ctx)?;
         User::get(&d.pool, &self.user_uuid)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn value(&self) -> FieldResult<String> {
+    pub async fn value(&self) -> GQLResult<String> {
         Ok(self.value.clone())
     }
 
-    pub async fn expires_at(&self) -> FieldResult<DateTime<Utc>> {
+    pub async fn expires_at(&self) -> GQLResult<DateTime<Utc>> {
         Ok(self.expires_at)
     }
 }

@@ -31,7 +31,7 @@ pub fn node(attr: TokenStream, item: TokenStream) -> TokenStream {
     item_impl.items.insert(
         0,
         parse_quote! {
-            pub async fn id(&self) -> FieldResult<ID> {
+            pub async fn id(&self) -> GQLResult<ID> {
                 let pk_str = vec![#(self.#pks.to_string()),*].join(":");
                 Ok(base64::encode(format!("{}:{}", #self_name, pk_str)).into())
             }

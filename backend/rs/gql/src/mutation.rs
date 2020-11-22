@@ -18,18 +18,19 @@ use crate::{
         current_user, get_data, graphql_id_to_db_keys, user_name_from_email,
     },
 };
-use async_graphql::{Context, FieldError, FieldResult, Json, ID};
+use async_graphql::{Context, Error, Json as GQLJson, Result, ID};
 use futures::TryFutureExt;
 use lazy_static::lazy_static;
+use serde_json::Value as Json;
 use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct MutationRoot;
 
 lazy_static! {
-    static ref INVALID_PERMISSIONS: FieldError = "invalid permissions".into();
-    static ref REQUIRES_ADMIN: FieldError = "requires admin privileges".into();
-    static ref REQUIRES_EDITOR: FieldError =
+    static ref INVALID_PERMISSIONS: Error = "invalid permissions".into();
+    static ref REQUIRES_ADMIN: Error = "requires admin privileges".into();
+    static ref REQUIRES_EDITOR: Error =
         "requires editor or admin privileges".into();
 }
 
@@ -40,7 +41,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         provider: Provider,
         token: String,
-    ) -> FieldResult<Credentials> {
+    ) -> Result<Credentials> {
         let d = get_data(ctx)?;
         let oauth2_user = match provider {
             Provider::Google => {
@@ -77,7 +78,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         refresh_token: String,
-    ) -> FieldResult<Credentials> {
+    ) -> Result<Credentials> {
         let d = get_data(ctx)?;
         let token = UserRefreshToken::get(&d.pool, &refresh_token).await?;
         let user = User::get(&d.pool, &token.user_uuid).await?;
@@ -97,7 +98,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         refresh_token: String,
-    ) -> FieldResult<String> {
+    ) -> Result<String> {
         let d = get_data(ctx)?;
         let token = UserRefreshToken::get(&d.pool, &refresh_token).await?;
         token.delete(&d.pool).await?;
@@ -108,7 +109,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         name: String,
-    ) -> FieldResult<User> {
+    ) -> Result<User> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         User::rename(&d.pool, &user.uuid, &name)
@@ -120,7 +121,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         name: String,
-    ) -> FieldResult<Project> {
+    ) -> Result<Project> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         Project::create(&d.pool, &name, &user.uuid)
@@ -133,7 +134,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         project_id: ID,
         name: String,
-    ) -> FieldResult<Project> {
+    ) -> Result<Project> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -153,7 +154,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> FieldResult<Project> {
+    ) -> Result<Project> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -173,7 +174,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -196,7 +197,7 @@ impl MutationRoot {
         project_id: ID,
         name: String,
         uri: String,
-    ) -> FieldResult<Dataset> {
+    ) -> Result<Dataset> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(project_id);
@@ -209,7 +210,7 @@ impl MutationRoot {
         }
         let ds = Dataset::create(&d.pool, &project_uuid, &name, &uri)
             .await
-            .map_err(|e| -> FieldError { e.into() })?;
+            .map_err(|e| -> Error { e.into() })?;
         // TODO(danj): call lambda function upload_dataset(uuid)
         Ok(ds)
     }
@@ -219,7 +220,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         dataset_id: ID,
         name: String,
-    ) -> FieldResult<Dataset> {
+    ) -> Result<Dataset> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataset_id);
@@ -239,7 +240,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         dataset_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataset_id);
@@ -261,8 +262,8 @@ impl MutationRoot {
         ctx: &Context<'_>,
         dataview_id: ID,
         operation: Operation,
-        args: Json<serde_json::Value>,
-    ) -> FieldResult<Dataview> {
+        args: GQLJson<Json>,
+    ) -> Result<Dataview> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataview_id);
@@ -288,7 +289,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         dataview_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataview_id);
@@ -301,7 +302,7 @@ impl MutationRoot {
         }
         let dv = Dataview::get(&d.pool, &dataview_uuid)
             .await
-            .map_err(|e| -> FieldError { e.into() })?;
+            .map_err(|e| -> Error { e.into() })?;
         if dv.uuid == dv.parent_uuid {
             return Err("cannot delete root dataview".into());
         }
@@ -316,7 +317,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         dataset_id: ID,
         name: String,
-    ) -> FieldResult<Analysis> {
+    ) -> Result<Analysis> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataset_id);
@@ -337,7 +338,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         analysis_id: ID,
         name: String,
-    ) -> FieldResult<Analysis> {
+    ) -> Result<Analysis> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(analysis_id);
@@ -358,7 +359,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         analysis_id: ID,
         dataview_id: ID,
-    ) -> FieldResult<Analysis> {
+    ) -> Result<Analysis> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let aks = graphql_id_to_db_keys(analysis_id);
@@ -380,7 +381,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(analysis_id);
@@ -403,7 +404,7 @@ impl MutationRoot {
         project_id: ID,
         user_id: ID,
         role: Role,
-    ) -> FieldResult<ProjectUserRole> {
+    ) -> Result<ProjectUserRole> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let pks = graphql_id_to_db_keys(project_id);
@@ -427,7 +428,7 @@ impl MutationRoot {
         project_id: ID,
         user_id: ID,
         role: Role,
-    ) -> FieldResult<ProjectUserRole> {
+    ) -> Result<ProjectUserRole> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let pks = graphql_id_to_db_keys(project_id);
@@ -450,7 +451,7 @@ impl MutationRoot {
         if prev_role.role == Role::Admin {
             let roles = ProjectUserRole::by_project(&d.pool, &project_uuid)
                 .await
-                .map_err(|e| -> FieldError { e.into() })?;
+                .map_err(|e| -> Error { e.into() })?;
             let admin_user_uuids: Vec<Uuid> = roles
                 .iter()
                 .filter(|r| r.role == Role::Admin)
@@ -471,7 +472,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         project_id: ID,
         user_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let pks = graphql_id_to_db_keys(project_id);
@@ -486,7 +487,7 @@ impl MutationRoot {
         }
         let roles = ProjectUserRole::by_project(&d.pool, &project_uuid)
             .await
-            .map_err(|e| -> FieldError { e.into() })?;
+            .map_err(|e| -> Error { e.into() })?;
         let admin_user_uuids: Vec<Uuid> = roles
             .iter()
             .filter(|r| r.role == Role::Admin)
@@ -506,8 +507,8 @@ impl MutationRoot {
         ctx: &Context<'_>,
         dataview_id: ID,
         name: Name,
-        args: Json<serde_json::Value>,
-    ) -> FieldResult<Statistic> {
+        args: GQLJson<Json>,
+    ) -> Result<Statistic> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataview_id);
@@ -527,7 +528,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         statistic_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(statistic_id);
@@ -550,8 +551,8 @@ impl MutationRoot {
         dataview_id: ID,
         name: String,
         type_: Type,
-        args: Json<serde_json::Value>,
-    ) -> FieldResult<Plot> {
+        args: GQLJson<Json>,
+    ) -> Result<Plot> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataview_id);
@@ -572,7 +573,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         plot_id: ID,
         name: String,
-    ) -> FieldResult<Plot> {
+    ) -> Result<Plot> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(plot_id);
@@ -592,7 +593,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         plot_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(plot_id);
@@ -616,8 +617,8 @@ impl MutationRoot {
         name: String,
         target: Option<String>,
         features: Vec<String>,
-        args: Json<serde_json::Value>,
-    ) -> FieldResult<Model> {
+        args: GQLJson<Json>,
+    ) -> Result<Model> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(dataview_id);
@@ -638,7 +639,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         model_id: ID,
         name: String,
-    ) -> FieldResult<Model> {
+    ) -> Result<Model> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(model_id);
@@ -658,7 +659,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         model_id: ID,
-    ) -> FieldResult<bool> {
+    ) -> Result<bool> {
         let d = get_data(ctx)?;
         let user = current_user(ctx)?;
         let dbks = graphql_id_to_db_keys(model_id);

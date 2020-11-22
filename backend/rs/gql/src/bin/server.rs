@@ -50,6 +50,7 @@ async fn serve() -> Result<()> {
             .header("Authorization")
             .and_then(|headers| Some(headers.last().as_str()))
             .and_then(|header| extract_bearer_token(header));
+        let mut req = async_graphql_tide::receive_request(req).await?;
         if let Some(token) = maybe_token {
             let user_uuid = user_uuid_from_token(&d.auth.jwt_secret, &token)
                 .map_err(|e| {
@@ -66,10 +67,8 @@ async fn serve() -> Result<()> {
                     )
                 })?);
         }
-        async_graphql_tide::graphql(req, schema, move |query_builder| {
-            query_builder.data(d)
-        })
-        .await
+        req = req.data(d);
+        async_graphql_tide::respond(schema.execute(req).await)
     }
     async fn playground(_: Request<State>) -> tide::Result<Response> {
         let mut resp = Response::new(StatusCode::Ok);

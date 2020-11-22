@@ -7,7 +7,7 @@ use crate::{
     },
     utils::graphql_id_to_db_keys,
 };
-use async_graphql::{FieldResult, Interface, ID};
+use async_graphql::{Result, Interface, ID};
 use std::str;
 
 #[derive(Clone, Debug, Interface)]
@@ -23,7 +23,7 @@ pub enum Node {
     User(User),
 }
 
-pub async fn id_to_node(pool: &Pool, id: ID) -> FieldResult<Node> {
+pub async fn id_to_node(pool: &Pool, id: ID) -> Result<Node> {
     let dbks = graphql_id_to_db_keys(id);
     let pk1 = dbks.keys.first().unwrap();
 
