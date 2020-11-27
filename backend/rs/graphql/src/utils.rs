@@ -1,7 +1,6 @@
 use crate::{models::User, ContextData, Error, ModelKeys};
 use async_graphql::{Context, Result, ID};
 use std::str;
-use uuid::Uuid;
 
 pub fn current_user<'ctx>(ctx: &'ctx Context<'_>) -> Result<&'ctx User> {
     let d = data(ctx)?;
@@ -22,14 +21,10 @@ pub fn model_keys(id: ID) -> ModelKeys {
         .split(":")
         .map(|v| v.to_string())
         .collect::<Vec<String>>();
-    let (model, keys_str) = model_keys.split_first().unwrap();
-    let keys = keys_str
-        .iter()
-        .map(|pk_str| Uuid::parse_str(pk_str).unwrap())
-        .collect::<Vec<Uuid>>();
+    let (model, keys) = model_keys.split_first().unwrap();
     ModelKeys {
-        model: model.to_owned(),
-        keys,
+        model: model.to_string(),
+        keys: keys.to_vec(),
     }
 }
 

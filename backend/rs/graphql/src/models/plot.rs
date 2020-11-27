@@ -14,6 +14,7 @@ use uuid::Uuid;
 #[derive(
     Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Enum, sqlx::Type,
 )]
+#[graphql(name = "PlotType")]
 #[sqlx(rename = "PLOT_TYPE")]
 #[sqlx(rename_all = "snake_case")]
 pub enum Type {

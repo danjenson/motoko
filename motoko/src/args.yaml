@@ -53,6 +53,8 @@ subcommands:
                 about: deploy infer-datatypes lambda function
             - invalidate-cache:
                 about: deploy invalidate-cache lambda function
+            - uri-to-sql-db:
+                about: deploy uri-to-sql-db lambda function
             - last-commit:
                 about: build and deploy last commit
             - web:

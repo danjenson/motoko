@@ -14,6 +14,7 @@ use uuid::Uuid;
 #[derive(
     Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Enum, Type,
 )]
+#[graphql(name = "StatisticName")]
 #[sqlx(rename = "STATISTIC_NAME")]
 #[sqlx(rename_all = "snake_case")]
 pub enum Name {

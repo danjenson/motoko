@@ -7,10 +7,14 @@ use crate::{
         ProjectUserRole, Role, Statistic, StatisticName, User,
         UserRefreshToken,
     },
+    types::UploadDatasetPayload,
     utils::{current_user, data, model_keys, user_name_from_email},
     Error,
 };
 use async_graphql::{Context, Error as GQLError, Json as GQLJson, Result, ID};
+use bytes::Bytes;
+use rusoto_core::Region;
+use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
 use serde_json::Value as Json;
 use uuid::Uuid;
 
@@ -122,7 +126,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -142,7 +146,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -162,7 +166,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -185,7 +189,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -195,8 +199,16 @@ impl Mutation {
         let ds = Dataset::create(&d.pool, &project_uuid, &name, &uri)
             .await
             .map_err(|e| -> GQLError { e.into() })?;
-        // TODO(danj): call lambda function upload_dataset(uuid), and add data
-        // types to upload
+        let lambda = LambdaClient::new(Region::UsWest1);
+        let payload = UploadDatasetPayload {
+            uri: uri.clone(),
+            uuid: ds.uuid.clone(),
+        };
+        let req = InvokeAsyncRequest {
+            function_name: "motoko-uri-to-sql-db".to_owned(),
+            invoke_args: Bytes::from(serde_json::to_vec(&payload)?),
+        };
+        lambda.invoke_async(req).await?;
         Ok(ds)
     }
 
@@ -209,7 +221,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataset_id);
-        let dataset_uuid = mkeys.keys.first().unwrap();
+        let dataset_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataset::role(&d.pool, &dataset_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -229,7 +241,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataset_id);
-        let dataset_uuid = mkeys.keys.first().unwrap();
+        let dataset_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataset::role(&d.pool, &dataset_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -252,7 +264,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataview_id);
-        let dataview_uuid = mkeys.keys.first().unwrap();
+        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -278,7 +290,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataview_id);
-        let dataview_uuid = mkeys.keys.first().unwrap();
+        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -306,7 +318,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataset_id);
-        let dataset_uuid = mkeys.keys.first().unwrap();
+        let dataset_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataset::role(&d.pool, &dataset_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -327,7 +339,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(analysis_id);
-        let analysis_uuid = mkeys.keys.first().unwrap();
+        let analysis_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Analysis::role(&d.pool, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -349,8 +361,8 @@ impl Mutation {
         let user = current_user(ctx)?;
         let aks = model_keys(analysis_id);
         let dks = model_keys(dataview_id);
-        let analysis_uuid = aks.keys.first().unwrap();
-        let dataview_uuid = dks.keys.first().unwrap();
+        let analysis_uuid = Uuid::parse_str(aks.keys.first().unwrap())?;
+        let dataview_uuid = Uuid::parse_str(dks.keys.first().unwrap())?;
         let role = Analysis::role(&d.pool, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -370,7 +382,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(analysis_id);
-        let analysis_uuid = mkeys.keys.first().unwrap();
+        let analysis_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Analysis::role(&d.pool, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -394,8 +406,8 @@ impl Mutation {
         let user = current_user(ctx)?;
         let pks = model_keys(project_id);
         let uks = model_keys(user_id);
-        let project_uuid = pks.keys.first().unwrap();
-        let user_uuid = uks.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(pks.keys.first().unwrap())?;
+        let user_uuid = Uuid::parse_str(uks.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -418,8 +430,8 @@ impl Mutation {
         let user = current_user(ctx)?;
         let pks = model_keys(project_id);
         let uks = model_keys(user_id);
-        let project_uuid = pks.keys.first().unwrap();
-        let user_uuid = uks.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(pks.keys.first().unwrap())?;
+        let user_uuid = Uuid::parse_str(uks.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -444,8 +456,7 @@ impl Mutation {
                 .filter(|r| r.role == Role::Admin)
                 .map(|r| r.user_uuid)
                 .collect();
-            if admin_user_uuids.len() == 1 && admin_user_uuids[0] == *user_uuid
-            {
+            if admin_user_uuids.len() == 1 && admin_user_uuids[0] == user_uuid {
                 return Err("a project must always have an admin".into());
             }
         }
@@ -464,8 +475,8 @@ impl Mutation {
         let user = current_user(ctx)?;
         let pks = model_keys(project_id);
         let uks = model_keys(user_id);
-        let project_uuid = pks.keys.first().unwrap();
-        let user_uuid = uks.keys.first().unwrap();
+        let project_uuid = Uuid::parse_str(pks.keys.first().unwrap())?;
+        let user_uuid = Uuid::parse_str(uks.keys.first().unwrap())?;
         let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -480,7 +491,7 @@ impl Mutation {
             .filter(|r| r.role == Role::Admin)
             .map(|r| r.user_uuid)
             .collect();
-        if admin_user_uuids.len() == 1 && admin_user_uuids[0] == *user_uuid {
+        if admin_user_uuids.len() == 1 && admin_user_uuids[0] == user_uuid {
             return Err("a project must always have an admin".into());
         }
         ProjectUserRole::delete(&d.pool, &project_uuid, &user_uuid)
@@ -499,7 +510,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataview_id);
-        let dataview_uuid = mkeys.keys.first().unwrap();
+        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -519,7 +530,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(statistic_id);
-        let statistic_uuid = mkeys.keys.first().unwrap();
+        let statistic_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Statistic::role(&d.pool, &statistic_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -543,7 +554,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataview_id);
-        let dataview_uuid = mkeys.keys.first().unwrap();
+        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -564,7 +575,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(plot_id);
-        let plot_uuid = mkeys.keys.first().unwrap();
+        let plot_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Plot::role(&d.pool, &plot_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -584,7 +595,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(plot_id);
-        let plot_uuid = mkeys.keys.first().unwrap();
+        let plot_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Plot::role(&d.pool, &plot_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -609,7 +620,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(dataview_id);
-        let dataview_uuid = mkeys.keys.first().unwrap();
+        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -630,7 +641,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(model_id);
-        let model_uuid = mkeys.keys.first().unwrap();
+        let model_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Model::role(&d.pool, &model_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -650,7 +661,7 @@ impl Mutation {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(model_id);
-        let model_uuid = mkeys.keys.first().unwrap();
+        let model_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
         let role = Model::role(&d.pool, &model_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
@@ -661,14 +672,5 @@ impl Mutation {
             .await
             .map(|_| true)
             .map_err(|e| e.into())
-    }
-
-    pub async fn infer_from_uri(
-        &self,
-        ctx: &Context<'_>,
-        uri: String,
-    ) -> Result<String> {
-        // TODO(danj): call infer cloud function from here
-        Ok("".into())
     }
 }

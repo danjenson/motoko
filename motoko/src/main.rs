@@ -261,6 +261,9 @@ fn deploy(args: &ArgMatches) {
         Some(("invalidate-cache", _)) => {
             deploy_python_lambda_function("invalidate-cache")
         }
+        Some(("uri-to-sql-db", _)) => {
+            deploy_python_lambda_function("uri-to-sql-db")
+        }
         Some(("last-commit", _)) => deploy_last_commit(),
         Some(("web", _)) => deploy_web(),
         _ => quit("invalid deploy target!"),
@@ -273,6 +276,7 @@ fn deploy_all() {
     deploy_graphql_lambda();
     deploy_python_lambda_function("invalidate-cache");
     deploy_python_lambda_function("infer-datatypes");
+    deploy_python_lambda_function("uri-to-sql-db");
     build_android_apks();
     deploy_android_apks();
     build_web();
@@ -469,8 +473,9 @@ fn lambda_exists(name: &str) -> bool {
 }
 
 fn deploy_python_lambda_function(name: &str) {
-    ensure_on_branch(&["dev", "prod"]);
     let dir = format!("backend/py/lambdas/{}", name);
+    // TODO(danj): should this only be on dev and prod branches?
+    // ensure_on_branch(&["dev", "prod"]);
     // ensure_clean(&dir);
     let zip_path = format!("/tmp/{}.zip", name);
     let fileb_zip_path = &format!("fileb://{}", zip_path);
@@ -495,6 +500,8 @@ fn deploy_python_lambda_function(name: &str) {
                 &function_name,
                 "--zip-file",
                 fileb_zip_path,
+                "--cli-connect-timeout",
+                "10000",
             ],
         );
     } else {
@@ -514,6 +521,8 @@ fn deploy_python_lambda_function(name: &str) {
                 "python3.8",
                 "--role",
                 "arn:aws:iam::902096072945:role/motoko-lambda",
+                "--cli-connect-timeout",
+                "10000",
             ],
         );
     }

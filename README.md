@@ -3,9 +3,6 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- setup RDS database
-  - figure out how bootstrapping/migrations will work
-- get gql lambda to work
 - call infer from graphql lambda
 - lambdas:
   - upload dataset with types
@@ -227,7 +224,7 @@
           - dev.api.motoko.ai/graphql is mapped to the Lambda function
             [motoko-graphql-dev](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-dev?tab=configuration),
             which is also where environment variables should be specified
-NOTES:
+##### NOTES:
 - Integration Requests from API Gateway to Lambda Functions must have Proxy
   enabled.
 - CloudFront Forwarding should have TTL set to 0 under `Behaviors` for requests
