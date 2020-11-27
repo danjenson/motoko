@@ -3,8 +3,11 @@
 > I'll have my AI analyze the data.
 
 ## TODO
+- setup RDS database
+  - figure out how bootstrapping/migrations will work
+- get gql lambda to work
+- call infer from graphql lambda
 - lambdas:
-  - infer data types
   - upload dataset with types
   - calculate statistic
   - plot
@@ -50,7 +53,14 @@
 - `motoko run setup-android-keystore`
 - `motoko -h`
 
-#### Database
+#### [Databases](https://us-west-1.console.aws.amazon.com/rds/home?region=us-west-1#database:id=motoko-free-tier;is-cluster=false)
+##### AWS RDS creation:
+- Create new db
+  [here](https://us-west-1.console.aws.amazon.com/rds/home?region=us-west-1#)
+- Make sure `public accessibility` option is set to `Yes`
+- Make sure you assign a security group that permits TCP traffic to port 5432,
+  like [this](https://us-west-1.console.aws.amazon.com/ec2/v2/home?region=us-west-1#SecurityGroups:search=motoko-free-tier)
+##### Setup
 - add sqlx cli:
   - `cargo install --version=0.1.0-beta.1 sqlx-cli --no-default-features --features postgres`
 - setup database:
@@ -61,6 +71,7 @@
   - `vim motoko/backend/rs/gql/.env`:
     - `ADDRESS=http://127.0.0.1:3000`
     - `DATABASE_URL=postgres://motoko:<password>@localhost/motoko  # app client`
+      - comment and switch to alternate between local and AWS db
     - `GOOGLE_OAUTH_CLIENT_ID=<ID>`
     - `JWT_KEY=<key>`
 - run migrations:
@@ -192,7 +203,8 @@
           [here](https://us-west-1.console.aws.amazon.com/apigateway/main/publish/domain-names?domain=api.motoko.ai&region=us-west-1),
           which is mapped to the `prod` stage of the gateway:
           - api.motoko.ai/graphql is mapped to the Lambda function
-            [motoko-graphql-prod](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-prod?tab=configuration)
+            [motoko-graphql-prod](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-prod?tab=configuration),
+            which is also where environment variables should be specified
     - dev.motoko.ai:
       - mapped to this [CloudFront
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E1O86QQ54GNZCY)
@@ -205,7 +217,7 @@
           - allows access by OAI (Origin Access Identity) to CloudFront
             distribution in [bucket
             policy](https://console.aws.amazon.com/s3/buckets/motoko-dev-www/?region=us-west-1&tab=permissions)
-    - dev.api.motoko.ai:
+    - api.dev.motoko.ai:
       - mapped to API Gateway
         [dev.api.motoko.ai](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/cxcbzd3q0d/resources/gomvi9ciy9):
         - edge-optimized gateway has an AWS managed CloudFront distribution
@@ -213,4 +225,10 @@
           [here](https://us-west-1.console.aws.amazon.com/apigateway/main/publish/domain-names?domain=api.dev.motoko.ai&region=us-west-1),
           which is mapped to the `dev` stage of the gateway:
           - dev.api.motoko.ai/graphql is mapped to the Lambda function
-            [motoko-graphql-dev](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-dev?tab=configuration)
+            [motoko-graphql-dev](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-dev?tab=configuration),
+            which is also where environment variables should be specified
+NOTES:
+- Integration Requests from API Gateway to Lambda Functions must have Proxy
+  enabled.
+- CloudFront Forwarding should have TTL set to 0 under `Behaviors` for requests
+  that shouldn't be cached

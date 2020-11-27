@@ -22,14 +22,7 @@ subcommands:
             - build-image:
                 about: build container image for automated deployment
             - graphql:
-                about: build graphql
-                settings:
-                    - ArgRequiredElseHelp
-                subcommands:
-                    - lambda:
-                        about: build graphql lambda function
-                    - server:
-                        about: build graphql server
+                about: build graphql lambda function
             - ios:
                 about: build iOS
             - web:
@@ -97,35 +90,22 @@ subcommands:
                     - ArgRequiredElseHelp
                 subcommands:
                     - query:
-                        about: query graphql
+                        about: query graphql lambda function
                         settings:
                             - ArgRequiredElseHelp
                         subcommands:
-                            - lambda:
-                                about: query graphql lambda function
-                                settings:
-                                    - ArgRequiredElseHelp
-                                subcommands:
-                                  - dev:
-                                      about: query graphql on dev
-                                      args:
-                                          - payload:
-                                              about: JSON payload
-                                              required: true
-                                  - prod:
-                                      about: query graphql on prod
-                                      args:
-                                          - payload:
-                                              about: JSON payload
-                                              required: true
-                            - server:
-                                about: query graphql server
-                                args:
-                                    - payload:
-                                        about: JSON payload
-                                        required: true
-                    - server:
-                        about: run local graphql server
+                          - dev:
+                              about: query graphql on dev
+                              args:
+                                  - payload:
+                                      about: JSON payload
+                                      required: true
+                          - prod:
+                              about: query graphql on prod
+                              args:
+                                  - payload:
+                                      about: JSON payload
+                                      required: true
             - infer-datatypes:
                 about: infer data types using cloud function
                 args:

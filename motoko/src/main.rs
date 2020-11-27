@@ -1,9 +1,12 @@
 use clap::{load_yaml, App, ArgMatches};
 use regex::Regex;
-use std::fs::{create_dir_all, remove_file, File};
-use std::io::Write;
-use std::path::Path;
-use std::process::{exit, Command, ExitStatus, Stdio};
+use std::{
+    env,
+    fs::{create_dir_all, remove_file, File},
+    io::Write,
+    path::Path,
+    process::{exit, Command, ExitStatus, Stdio},
+};
 use which::which;
 
 fn main() {
@@ -114,7 +117,7 @@ fn build(args: &ArgMatches) {
     match args.subcommand() {
         Some(("android", args)) => build_android(args),
         Some(("build-image", _)) => build_build_image(),
-        Some(("graphql", args)) => build_graphql(args),
+        Some(("graphql", _)) => build_graphql_lambda(),
         Some(("ios", _)) => build_ios(),
         Some(("web", _)) => build_web(),
         _ => quit("invalid build target!"),
@@ -204,25 +207,19 @@ fn build_build_image() {
     run_from("build_image", "docker", &["build", "-t", "motoko", "."]);
 }
 
-fn build_graphql(args: &ArgMatches) {
-    match args.subcommand() {
-        Some(("lambda", _)) => build_graphql_lambda(),
-        Some(("server", _)) => build_graphql_server(),
-        _ => quit("invalid graphql binary!"),
-    }
-}
-
 fn build_graphql_lambda() {
-    ensure_on_branch(&["dev", "prod"]);
-    ensure_clean("backend/rs/gql");
+    // TODO(danj): should this be restricted?
+    // ensure_on_branch(&["dev", "prod"]);
+    // ensure_clean("backend/rs/graphql");
+    env::set_var("PKG_CONFIG_ALLOW_CROSS", "1");
     run_from(
         ".",
         "rustup",
         &["target", "add", "x86_64-unknown-linux-musl"],
     );
-    run_from("backend/rs/gql", "cargo", &["test"]);
+    run_from("backend/rs/graphql", "cargo", &["test"]);
     run_from(
-        "backend/rs/gql",
+        "backend/rs/graphql",
         "cargo",
         &[
             "build",
@@ -232,15 +229,6 @@ fn build_graphql_lambda() {
             "--bin",
             "lambda",
         ],
-    );
-}
-
-fn build_graphql_server() {
-    run_from("backend/rs/gql", "cargo", &["test"]);
-    run_from(
-        "backend/rs/gql",
-        "cargo",
-        &["build", "--release", "--bin", "server"],
     );
 }
 
@@ -410,10 +398,15 @@ fn deploy_build_image() {
 }
 
 fn deploy_graphql_lambda() {
-    ensure_on_branch(&["dev", "prod"]);
-    let dir = "backend/rs/query";
-    let function_name =
-        &format!("{}-graphql-{}", current_repo(), current_branch());
+    // TODO(danj): should this be restricted?
+    // ensure_on_branch(&["dev", "prod"]);
+    let dir = "backend/rs/graphql";
+    let branch = if current_branch() == "prod" {
+        "prod"
+    } else {
+        "dev"
+    };
+    let function_name = &format!("{}-graphql-{}", current_repo(), branch);
     let build_dir = "target/x86_64-unknown-linux-musl/release";
     let binary_path = &format!("{}/lambda", build_dir);
     let binary_bootstrap_path = &format!("{}/{}", build_dir, "bootstrap");
@@ -654,7 +647,6 @@ fn emulate_web() {
 fn graphql(args: &ArgMatches) {
     match args.subcommand() {
         Some(("query", args)) => graphql_query(args),
-        Some(("server", _)) => graphql_server(),
         _ => quit("must specify either 'dev' or 'prod' tier"),
     }
 }
@@ -662,7 +654,6 @@ fn graphql(args: &ArgMatches) {
 fn graphql_query(args: &ArgMatches) {
     match args.subcommand() {
         Some(("lambda", args)) => graphql_query_lambda(args),
-        Some(("server", args)) => graphql_query_server(args),
         _ => quit("must specify either 'dev' or 'prod' tier"),
     }
 }
@@ -691,14 +682,6 @@ fn _gql(endpoint: &str, args: &ArgMatches) {
         }
         _ => quit("must provide a JSON payload"),
     }
-}
-
-fn graphql_query_server(args: &ArgMatches) {
-    _gql("http://localhost:3000", args);
-}
-
-fn graphql_server() {
-    run_from("backend/rs/gql", "cargo", &["run", "--bin", "server"]);
 }
 
 fn reset_android_keystore() {
