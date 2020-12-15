@@ -21,10 +21,14 @@ subcommands:
                         about: build app bundle for Play Store
             - build-image:
                 about: build container image for automated deployment
+            - garbage-collect:
+                about: build garbage-collect lambda function
             - graphql:
                 about: build graphql lambda function
             - ios:
                 about: build iOS
+            - sam:
+                about: build backend AWS SAM
             - web:
                 about: build website
     - deploy:
@@ -45,6 +49,8 @@ subcommands:
                         about: deploy app bundle for Play Store
             - build-image:
                 about: deploy container image for automated deployment
+            - garbage-collect:
+                about: deploy garbage-collect lambda function
             - graphql:
                 about: deploy graphql lambda function
             - ios:
@@ -67,7 +73,11 @@ subcommands:
           - android:
               about: install Android app on connected device
           - aws:
-              about: install AWS CLI v2
+              about: install AWS CLI v2 and SAM
+          - flutter:
+              about: install flutter to /data/repos/flutter/bin
+          - git-hooks:
+              about: install git-hooks
           - ios:
               about: install iOS app on connected device
     - run:
@@ -75,17 +85,21 @@ subcommands:
         settings:
             - ArgRequiredElseHelp
         subcommands:
-            - emulator:
-                about: run emulator
+            - connect-to-aws-db:
+                about: connects to aws database
+            - frontend:
+                about: run frontend
                 settings:
                     - ArgRequiredElseHelp
                 subcommands:
                     - android:
-                        about: run android emulator
+                        about: run on android emulator
                     - ios:
-                        about: run ios emulator
+                        about: run on ios emulator
                     - web:
-                        about: run web emulator
+                        about: run on web emulator
+                    - device:
+                        about: run on connected device
             - graphql:
                 about: run graphql
                 settings:
@@ -118,5 +132,16 @@ subcommands:
                 about: invalidate CloudFront distribution cache
             - reset-android-keystore:
                 about: resets keystore used for signing android apps
+            - reset-databases:
+                about: resets the databases
+            - upload-backend-dotenv:
+                about: uploads motoko/backend/.env to secrets manager
+            - upload-debug-android-keystore:
+                about: uploads debug android keystore after reset
             - setup-android-keystore:
                 about: sets up keystore locally for signing android apps
+            - setup-backend-dotenv:
+                about: >
+                  downloads motoko/backend/.env and links to
+                  motoko/backend/rs/graphql/.env and
+                  motoko/backend/rs/garbage-collect/.env

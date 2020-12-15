@@ -1,7 +1,7 @@
 use crate::{
+    gql::data,
     models::{Project, User},
-    types::Pool,
-    utils::data,
+    types::Db,
 };
 use async_graphql::{Context, Enum, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
@@ -32,7 +32,7 @@ pub struct ProjectUserRole {
 
 impl ProjectUserRole {
     pub async fn create(
-        pool: &Pool,
+        db: &Db,
         project_uuid: &Uuid,
         user_uuid: &Uuid,
         role: &Role,
@@ -46,12 +46,12 @@ impl ProjectUserRole {
         .bind(project_uuid)
         .bind(user_uuid)
         .bind(role)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
     pub async fn get(
-        pool: &Pool,
+        db: &Db,
         project_uuid: &Uuid,
         user_uuid: &Uuid,
     ) -> SQLxResult<Self> {
@@ -65,12 +65,12 @@ impl ProjectUserRole {
         )
         .bind(project_uuid)
         .bind(user_uuid)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
     pub async fn modify(
-        pool: &Pool,
+        db: &Db,
         project_uuid: &Uuid,
         user_uuid: &Uuid,
         role: &Role,
@@ -87,12 +87,12 @@ impl ProjectUserRole {
         .bind(project_uuid)
         .bind(user_uuid)
         .bind(role)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
     pub async fn by_project(
-        pool: &Pool,
+        db: &Db,
         project_uuid: &Uuid,
     ) -> SQLxResult<Vec<Self>> {
         query_as(
@@ -103,14 +103,11 @@ impl ProjectUserRole {
             "#,
         )
         .bind(project_uuid)
-        .fetch_all(pool)
+        .fetch_all(db)
         .await
     }
 
-    pub async fn by_user(
-        pool: &Pool,
-        user_uuid: &Uuid,
-    ) -> SQLxResult<Vec<Self>> {
+    pub async fn by_user(db: &Db, user_uuid: &Uuid) -> SQLxResult<Vec<Self>> {
         query_as(
             r#"
             SELECT *
@@ -119,12 +116,12 @@ impl ProjectUserRole {
             "#,
         )
         .bind(user_uuid)
-        .fetch_all(pool)
+        .fetch_all(db)
         .await
     }
 
     pub async fn delete(
-        pool: &Pool,
+        db: &Db,
         project_uuid: &Uuid,
         user_uuid: &Uuid,
     ) -> SQLxResult<()> {
@@ -137,7 +134,7 @@ impl ProjectUserRole {
         )
         .bind(project_uuid)
         .bind(user_uuid)
-        .execute(pool)
+        .execute(db)
         .await
         .map(|_| ())
     }
@@ -156,14 +153,14 @@ impl ProjectUserRole {
 
     pub async fn project(&self, ctx: &Context<'_>) -> GQLResult<Project> {
         let d = data(ctx)?;
-        Project::get(&d.pool, &self.project_uuid)
+        Project::get(&d.db, &self.project_uuid)
             .await
             .map_err(|e| e.into())
     }
 
     pub async fn user(&self, ctx: &Context<'_>) -> GQLResult<User> {
         let d = data(ctx)?;
-        User::get(&d.pool, &self.user_uuid)
+        User::get(&d.db, &self.user_uuid)
             .await
             .map_err(|e| e.into())
     }

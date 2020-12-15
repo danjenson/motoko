@@ -1,11 +1,11 @@
 use crate::{
+    gql::data,
     models::{
         analysis::Analysis,
         dataset::Dataset,
         project_user_role::{ProjectUserRole, Role},
     },
-    types::Pool,
-    utils::data,
+    types::Db,
 };
 use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
@@ -20,15 +20,16 @@ pub struct Project {
     pub updated_at: DateTime<Utc>,
     pub uuid: Uuid,
     pub name: String,
+    pub is_public: bool,
 }
 
 impl Project {
     pub async fn create(
-        pool: &Pool,
+        db: &Db,
         name: &str,
         user_uuid: &Uuid,
     ) -> SQLxResult<Self> {
-        let mut tx = pool.begin().await?;
+        let mut tx = db.begin().await?;
         let project: Self =
             query_as("INSERT INTO projects (name) VALUES ($1) RETURNING *")
                 .bind(name)
@@ -49,18 +50,14 @@ impl Project {
         Ok(project)
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
+    pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM projects WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(pool)
+            .fetch_one(db)
             .await
     }
 
-    pub async fn rename(
-        pool: &Pool,
-        uuid: &Uuid,
-        name: &str,
-    ) -> SQLxResult<Self> {
+    pub async fn rename(db: &Db, uuid: &Uuid, name: &str) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE projects
@@ -71,11 +68,11 @@ impl Project {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
-    pub async fn make_public(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
+    pub async fn make_public(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE projects
@@ -85,14 +82,14 @@ impl Project {
             "#,
         )
         .bind(uuid)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
+    pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM projects WHERE uuid = $1")
             .bind(uuid)
-            .execute(pool)
+            .execute(db)
             .await
             .map(|_| ())
     }
@@ -113,11 +110,15 @@ impl Project {
         &self.name
     }
 
+    pub async fn is_public(&self) -> &bool {
+        &self.is_public
+    }
+
     pub async fn datasets(&self, ctx: &Context<'_>) -> GQLResult<Vec<Dataset>> {
         let d = data(ctx)?;
         query_as("SELECT * FROM datasets WHERE project_uuid = $1")
             .bind(self.uuid)
-            .fetch_all(&d.pool)
+            .fetch_all(&d.db)
             .await
             .map_err(|e| e.into())
     }
@@ -129,7 +130,7 @@ impl Project {
         let d = data(ctx)?;
         query_as("SELECT * FROM analyses WHERE project_uuid = $1")
             .bind(self.uuid)
-            .fetch_all(&d.pool)
+            .fetch_all(&d.db)
             .await
             .map_err(|e| e.into())
     }
@@ -141,7 +142,7 @@ impl Project {
         let d = data(ctx)?;
         query_as("SELECT * FROM project_user_roles WHERE project_uuid = $1")
             .bind(self.uuid)
-            .fetch_all(&d.pool)
+            .fetch_all(&d.db)
             .await
             .map_err(|e| e.into())
     }

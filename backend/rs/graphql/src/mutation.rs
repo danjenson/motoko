@@ -2,20 +2,26 @@ use crate::{
     auth::{
         credentials_for_user, validate_google_id_token, Credentials, Provider,
     },
+    gql::{
+        current_user, data, get_invocation_type, graphql_id_to_uuid,
+        is_current_user, model_keys,
+    },
     models::{
         Analysis, Dataset, Dataview, Model, Operation, Plot, PlotType, Project,
         ProjectUserRole, Role, Statistic, StatisticName, User,
         UserRefreshToken,
     },
     types::UploadDatasetPayload,
-    utils::{current_user, data, model_keys, user_name_from_email},
+    utils::{
+        as_bytes, dataset_table_name, dataview_view_name, user_name_from_email,
+    },
     Error,
 };
 use async_graphql::{Context, Error as GQLError, Json as GQLJson, Result, ID};
-use bytes::Bytes;
-use rusoto_core::Region;
-use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
+use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
 use serde_json::Value as Json;
+use sqlx::query;
+use tokio_compat_02::FutureExt;
 use uuid::Uuid;
 
 pub struct Mutation;
@@ -38,12 +44,12 @@ impl Mutation {
                 .await?
             }
         };
-        let maybe_user = User::get_by_email(&d.pool, &oauth2_user.email).await;
+        let maybe_user = User::get_by_email(&d.db, &oauth2_user.email).await;
         let user = match maybe_user {
             Ok(user) => user,
             Err(_) => {
                 User::create(
-                    &d.pool,
+                    &d.db,
                     &user_name_from_email(&oauth2_user.email),
                     &oauth2_user.display_name,
                     &oauth2_user.email,
@@ -53,7 +59,7 @@ impl Mutation {
         };
         let creds = credentials_for_user(&d.auth.jwt_secret, &user)?;
         UserRefreshToken::create(
-            &d.pool,
+            &d.db,
             &user.uuid,
             &creds.refresh_token,
             &creds.refresh_token_expires_at,
@@ -68,29 +74,37 @@ impl Mutation {
         refresh_token: String,
     ) -> Result<Credentials> {
         let d = data(ctx)?;
-        let token = UserRefreshToken::get(&d.pool, &refresh_token).await?;
-        let user = User::get(&d.pool, &token.user_uuid).await?;
+        let token = UserRefreshToken::get(&d.db, &refresh_token).await?;
+        let user = User::get(&d.db, &token.user_uuid).await?;
         let creds = credentials_for_user(&d.auth.jwt_secret, &user)?;
         UserRefreshToken::create(
-            &d.pool,
+            &d.db,
             &user.uuid,
             &creds.refresh_token,
             &creds.refresh_token_expires_at,
         )
         .await?;
-        token.delete(&d.pool).await?;
+        UserRefreshToken::delete(&d.db, &refresh_token).await?;
         Ok(creds)
     }
 
-    pub async fn delete_refresh_token(
+    pub async fn delete_user_refresh_token(
         &self,
         ctx: &Context<'_>,
-        refresh_token: String,
-    ) -> Result<String> {
+        user_refresh_token_id: ID,
+    ) -> Result<ID> {
         let d = data(ctx)?;
-        let token = UserRefreshToken::get(&d.pool, &refresh_token).await?;
-        token.delete(&d.pool).await?;
-        Ok(refresh_token)
+        let mkeys = model_keys(&user_refresh_token_id)?;
+        let value = mkeys
+            .keys
+            .first()
+            .ok_or::<GQLError>(Error::InvalidGraphQLID.into())?;
+        let token = UserRefreshToken::get(&d.db, &value).await?;
+        is_current_user(&token.user_uuid, ctx)?;
+        UserRefreshToken::delete(&d.db, &value)
+            .await
+            .map(|_| user_refresh_token_id)
+            .map_err(|e| e.into())
     }
 
     pub async fn change_user_name(
@@ -100,9 +114,29 @@ impl Mutation {
     ) -> Result<User> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        User::rename(&d.pool, &user.uuid, &name)
+        User::rename(&d.db, &user.uuid, &name)
             .await
             .map_err(|e| e.into())
+    }
+
+    pub async fn delete_node(&self, ctx: &Context<'_>, id: ID) -> Result<ID> {
+        let mkeys = model_keys(&id)?;
+        match mkeys.model.as_str() {
+            "Analysis" => Self::delete_analysis(&self, ctx, id).await,
+            "Dataset" => Self::delete_dataset(&self, ctx, id).await,
+            "Dataview" => Self::delete_dataview(&self, ctx, id).await,
+            "Model" => Self::delete_model(&self, ctx, id).await,
+            "Plot" => Self::delete_plot(&self, ctx, id).await,
+            "Project" => Self::delete_project(&self, ctx, id).await,
+            "ProjectUserRole" => {
+                Self::delete_project_user_role(&self, ctx, id).await
+            }
+            "Statistic" => Self::delete_statistic(&self, ctx, id).await,
+            "UserRefreshToken" => {
+                Self::delete_user_refresh_token(&self, ctx, id).await
+            }
+            _ => Err(Error::UnsupportedOperation.into()),
+        }
     }
 
     pub async fn create_project(
@@ -112,7 +146,7 @@ impl Mutation {
     ) -> Result<Project> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        Project::create(&d.pool, &name, &user.uuid)
+        Project::create(&d.db, &name, &user.uuid)
             .await
             .map_err(|e| e.into())
     }
@@ -125,15 +159,14 @@ impl Mutation {
     ) -> Result<Project> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Project::rename(&d.pool, &project_uuid, &name)
+        Project::rename(&d.db, &project_uuid, &name)
             .await
             .map_err(|e| e.into())
     }
@@ -145,15 +178,14 @@ impl Mutation {
     ) -> Result<Project> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role != Role::Admin {
             return Err(Error::RequiresAdminPermissions.into());
         }
-        Project::make_public(&d.pool, &project_uuid)
+        Project::make_public(&d.db, &project_uuid)
             .await
             .map_err(|e| e.into())
     }
@@ -162,20 +194,19 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role != Role::Admin {
             return Err(Error::RequiresAdminPermissions.into());
         }
-        Project::delete(&d.pool, &project_uuid)
+        Project::delete(&d.db, &project_uuid)
             .await
-            .map(|_| true)
+            .map(|_| project_id)
             .map_err(|e| e.into())
     }
 
@@ -188,27 +219,30 @@ impl Mutation {
     ) -> Result<Dataset> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        let ds = Dataset::create(&d.pool, &project_uuid, &name, &uri)
+        let ds = Dataset::create(&d.db, &project_uuid, &name, &uri)
             .await
             .map_err(|e| -> GQLError { e.into() })?;
-        let lambda = LambdaClient::new(Region::UsWest1);
+        let lambda = LambdaClient::new(d.region.clone());
         let payload = UploadDatasetPayload {
             uri: uri.clone(),
             uuid: ds.uuid.clone(),
         };
-        let req = InvokeAsyncRequest {
+        let req = InvocationRequest {
+            client_context: None,
             function_name: "motoko-uri-to-sql-db".to_owned(),
-            invoke_args: Bytes::from(serde_json::to_vec(&payload)?),
+            invocation_type: get_invocation_type(ctx),
+            log_type: None,
+            payload: Some(as_bytes(&payload)?),
+            qualifier: None,
         };
-        lambda.invoke_async(req).await?;
+        lambda.invoke(req).compat().await?;
         Ok(ds)
     }
 
@@ -220,15 +254,14 @@ impl Mutation {
     ) -> Result<Dataset> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataset_id);
-        let dataset_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataset::role(&d.pool, &dataset_uuid, &user.uuid)
+        let dataset_uuid = graphql_id_to_uuid(&dataset_id)?;
+        let role = Dataset::role(&d.db, &dataset_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Dataset::rename(&d.pool, &dataset_uuid, &name)
+        Dataset::rename(&d.db, &dataset_uuid, &name)
             .await
             .map_err(|e| e.into())
     }
@@ -237,20 +270,24 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         dataset_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataset_id);
-        let dataset_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataset::role(&d.pool, &dataset_uuid, &user.uuid)
+        let dataset_uuid = graphql_id_to_uuid(&dataset_id)?;
+        let role = Dataset::role(&d.db, &dataset_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Dataset::delete(&d.pool, &dataset_uuid)
+        let table = dataset_table_name(&dataset_uuid);
+        query(&format!("DROP TABLE IF EXISTS {}", table))
+            .execute(&d.data_db)
             .await
-            .map(|_| true)
+            .map_err(|e| -> GQLError { e.into() })?;
+        Dataset::delete(&d.db, &dataset_uuid)
+            .await
+            .map(|_| dataset_id)
             .map_err(|e| e.into())
     }
 
@@ -263,49 +300,52 @@ impl Mutation {
     ) -> Result<Dataview> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataview_id);
-        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
+        let role = Dataview::role(&d.db, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Dataview::create(&d.pool, &dataview_uuid, &operation, &args)
+        Dataview::create(&d.db, &dataview_uuid, &operation, &args)
             .await
             .map_err(|e| e.into())
         // TODO(danj): copy (to avoid on delete casade problems)
         // plots/statistics/models that are still valid?
         // select,sort,mutate are valid
-        // Plot::link_if_valid(&d.pool, &dv.uuid)
-        // Statistic::link_if_valid(&d.pool, &dv.uuid)
-        // Model::link_if_valid(&d.pool, &dv.uuid)
+        // Plot::link_if_valid(&d.db, &dv.uuid)
+        // Statistic::link_if_valid(&d.db, &dv.uuid)
+        // Model::link_if_valid(&d.db, &dv.uuid)
     }
 
     pub async fn delete_dataview(
         &self,
         ctx: &Context<'_>,
         dataview_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataview_id);
-        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
+        let role = Dataview::role(&d.db, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        let dv = Dataview::get(&d.pool, &dataview_uuid)
+        let dv = Dataview::get(&d.db, &dataview_uuid)
             .await
             .map_err(|e| -> GQLError { e.into() })?;
         if dv.uuid == dv.parent_uuid {
             return Err("cannot delete root dataview".into());
         }
-        Dataview::delete(&d.pool, &dataview_uuid)
+        let view = dataview_view_name(&dataview_uuid);
+        query(&format!("DROP VIEW IF EXISTS {}", view))
+            .execute(&d.data_db)
             .await
-            .map(|_| true)
+            .map_err(|e| -> GQLError { e.into() })?;
+        Dataview::delete(&d.db, &dataview_uuid)
+            .await
+            .map(|_| dataview_id)
             .map_err(|e| e.into())
     }
 
@@ -317,15 +357,14 @@ impl Mutation {
     ) -> Result<Analysis> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataset_id);
-        let dataset_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataset::role(&d.pool, &dataset_uuid, &user.uuid)
+        let dataset_uuid = graphql_id_to_uuid(&dataset_id)?;
+        let role = Dataset::role(&d.db, &dataset_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Analysis::create(&d.pool, &dataset_uuid, &name)
+        Analysis::create(&d.db, &dataset_uuid, &name)
             .await
             .map_err(|e| e.into())
     }
@@ -338,15 +377,14 @@ impl Mutation {
     ) -> Result<Analysis> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(analysis_id);
-        let analysis_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Analysis::role(&d.pool, &analysis_uuid, &user.uuid)
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let role = Analysis::role(&d.db, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Analysis::rename(&d.pool, &analysis_uuid, &name)
+        Analysis::rename(&d.db, &analysis_uuid, &name)
             .await
             .map_err(|e| e.into())
     }
@@ -359,17 +397,15 @@ impl Mutation {
     ) -> Result<Analysis> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let aks = model_keys(analysis_id);
-        let dks = model_keys(dataview_id);
-        let analysis_uuid = Uuid::parse_str(aks.keys.first().unwrap())?;
-        let dataview_uuid = Uuid::parse_str(dks.keys.first().unwrap())?;
-        let role = Analysis::role(&d.pool, &analysis_uuid, &user.uuid)
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
+        let role = Analysis::role(&d.db, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Analysis::point_to(&d.pool, &analysis_uuid, &dataview_uuid)
+        Analysis::point_to(&d.db, &analysis_uuid, &dataview_uuid)
             .await
             .map_err(|e| e.into())
     }
@@ -378,20 +414,19 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(analysis_id);
-        let analysis_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Analysis::role(&d.pool, &analysis_uuid, &user.uuid)
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let role = Analysis::role(&d.db, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Analysis::delete(&d.pool, &analysis_uuid)
+        Analysis::delete(&d.db, &analysis_uuid)
             .await
-            .map(|_| true)
+            .map(|_| analysis_id)
             .map_err(|e| e.into())
     }
 
@@ -404,17 +439,15 @@ impl Mutation {
     ) -> Result<ProjectUserRole> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let pks = model_keys(project_id);
-        let uks = model_keys(user_id);
-        let project_uuid = Uuid::parse_str(pks.keys.first().unwrap())?;
-        let user_uuid = Uuid::parse_str(uks.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
+        let user_uuid = graphql_id_to_uuid(&user_id)?;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role != Role::Admin {
             return Err(Error::RequiresAdminPermissions.into());
         }
-        ProjectUserRole::create(&d.pool, &project_uuid, &user_uuid, &role)
+        ProjectUserRole::create(&d.db, &project_uuid, &user_uuid, &role)
             .await
             .map_err(|e| e.into())
     }
@@ -428,27 +461,22 @@ impl Mutation {
     ) -> Result<ProjectUserRole> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let pks = model_keys(project_id);
-        let uks = model_keys(user_id);
-        let project_uuid = Uuid::parse_str(pks.keys.first().unwrap())?;
-        let user_uuid = Uuid::parse_str(uks.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
+        let user_uuid = graphql_id_to_uuid(&user_id)?;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role != Role::Admin {
             return Err(Error::RequiresAdminPermissions.into());
         }
-        let prev_role =
-            ProjectUserRole::get(&d.pool, &project_uuid, &user_uuid)
-                .await
-                .map_err(|_| -> GQLError {
-                    Error::InvalidPermissions.into()
-                })?;
+        let prev_role = ProjectUserRole::get(&d.db, &project_uuid, &user_uuid)
+            .await
+            .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if prev_role.role == role {
             return Ok(prev_role);
         }
         if prev_role.role == Role::Admin {
-            let roles = ProjectUserRole::by_project(&d.pool, &project_uuid)
+            let roles = ProjectUserRole::by_project(&d.db, &project_uuid)
                 .await
                 .map_err(|e| -> GQLError { e.into() })?;
             let admin_user_uuids: Vec<Uuid> = roles
@@ -460,30 +488,37 @@ impl Mutation {
                 return Err("a project must always have an admin".into());
             }
         }
-        ProjectUserRole::modify(&d.pool, &project_uuid, &user_uuid, &role)
+        ProjectUserRole::modify(&d.db, &project_uuid, &user_uuid, &role)
             .await
             .map_err(|e| e.into())
     }
 
-    pub async fn delete_role(
+    pub async fn delete_project_user_role(
         &self,
         ctx: &Context<'_>,
-        project_id: ID,
-        user_id: ID,
-    ) -> Result<bool> {
+        project_user_role_id: ID,
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let pks = model_keys(project_id);
-        let uks = model_keys(user_id);
-        let project_uuid = Uuid::parse_str(pks.keys.first().unwrap())?;
-        let user_uuid = Uuid::parse_str(uks.keys.first().unwrap())?;
-        let pur = ProjectUserRole::get(&d.pool, &project_uuid, &user.uuid)
+        let mkeys = model_keys(&project_user_role_id)?;
+        let project_uuid =
+            mkeys
+                .keys
+                .get(0)
+                .map(|v| Uuid::parse_str(v))
+                .ok_or::<GQLError>(Error::InvalidGraphQLID.into())??;
+        let user_uuid = mkeys
+            .keys
+            .get(1)
+            .map(|v| Uuid::parse_str(v))
+            .ok_or::<GQLError>(Error::InvalidGraphQLID.into())??;
+        let pur = ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if pur.role != Role::Admin {
             return Err(Error::RequiresAdminPermissions.into());
         }
-        let roles = ProjectUserRole::by_project(&d.pool, &project_uuid)
+        let roles = ProjectUserRole::by_project(&d.db, &project_uuid)
             .await
             .map_err(|e| -> GQLError { e.into() })?;
         let admin_user_uuids: Vec<Uuid> = roles
@@ -494,9 +529,9 @@ impl Mutation {
         if admin_user_uuids.len() == 1 && admin_user_uuids[0] == user_uuid {
             return Err("a project must always have an admin".into());
         }
-        ProjectUserRole::delete(&d.pool, &project_uuid, &user_uuid)
+        ProjectUserRole::delete(&d.db, &project_uuid, &user_uuid)
             .await
-            .map(|_| true)
+            .map(|_| project_user_role_id)
             .map_err(|e| e.into())
     }
 
@@ -509,15 +544,14 @@ impl Mutation {
     ) -> Result<Statistic> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataview_id);
-        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
+        let role = Dataview::role(&d.db, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Statistic::create(&d.pool, &dataview_uuid, &name, &args)
+        Statistic::create(&d.db, &dataview_uuid, &name, &args)
             .await
             .map_err(|e| e.into())
     }
@@ -526,20 +560,19 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         statistic_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(statistic_id);
-        let statistic_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Statistic::role(&d.pool, &statistic_uuid, &user.uuid)
+        let statistic_uuid = graphql_id_to_uuid(&statistic_id)?;
+        let role = Statistic::role(&d.db, &statistic_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Statistic::delete(&d.pool, &statistic_uuid)
+        Statistic::delete(&d.db, &statistic_uuid)
             .await
-            .map(|_| true)
+            .map(|_| statistic_id)
             .map_err(|e| e.into())
     }
 
@@ -553,15 +586,14 @@ impl Mutation {
     ) -> Result<Plot> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataview_id);
-        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
+        let role = Dataview::role(&d.db, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Plot::create(&d.pool, &dataview_uuid, &name, &type_, &args)
+        Plot::create(&d.db, &dataview_uuid, &name, &type_, &args)
             .await
             .map_err(|e| e.into())
     }
@@ -574,15 +606,14 @@ impl Mutation {
     ) -> Result<Plot> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(plot_id);
-        let plot_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Plot::role(&d.pool, &plot_uuid, &user.uuid)
+        let plot_uuid = graphql_id_to_uuid(&plot_id)?;
+        let role = Plot::role(&d.db, &plot_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Plot::rename(&d.pool, &plot_uuid, &name)
+        Plot::rename(&d.db, &plot_uuid, &name)
             .await
             .map_err(|e| e.into())
     }
@@ -591,20 +622,19 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         plot_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(plot_id);
-        let plot_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Plot::role(&d.pool, &plot_uuid, &user.uuid)
+        let plot_uuid = graphql_id_to_uuid(&plot_id)?;
+        let role = Plot::role(&d.db, &plot_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Plot::delete(&d.pool, &plot_uuid)
+        Plot::delete(&d.db, &plot_uuid)
             .await
-            .map(|_| true)
+            .map(|_| plot_id)
             .map_err(|e| e.into())
     }
 
@@ -619,15 +649,14 @@ impl Mutation {
     ) -> Result<Model> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(dataview_id);
-        let dataview_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Dataview::role(&d.pool, &dataview_uuid, &user.uuid)
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
+        let role = Dataview::role(&d.db, &dataview_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Model::create(&d.pool, &dataview_uuid, &name, &target, &features, &args)
+        Model::create(&d.db, &dataview_uuid, &name, &target, &features, &args)
             .await
             .map_err(|e| e.into())
     }
@@ -640,15 +669,14 @@ impl Mutation {
     ) -> Result<Model> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(model_id);
-        let model_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Model::role(&d.pool, &model_uuid, &user.uuid)
+        let model_uuid = graphql_id_to_uuid(&model_id)?;
+        let role = Model::role(&d.db, &model_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Model::rename(&d.pool, &model_uuid, &name)
+        Model::rename(&d.db, &model_uuid, &name)
             .await
             .map_err(|e| e.into())
     }
@@ -657,20 +685,19 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         model_id: ID,
-    ) -> Result<bool> {
+    ) -> Result<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(model_id);
-        let model_uuid = Uuid::parse_str(mkeys.keys.first().unwrap())?;
-        let role = Model::role(&d.pool, &model_uuid, &user.uuid)
+        let model_uuid = graphql_id_to_uuid(&model_id)?;
+        let role = Model::role(&d.db, &model_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Model::delete(&d.pool, &model_uuid)
+        Model::delete(&d.db, &model_uuid)
             .await
-            .map(|_| true)
+            .map(|_| model_id)
             .map_err(|e| e.into())
     }
 }

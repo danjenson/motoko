@@ -1,13 +1,15 @@
 use crate::{
+    gql::data,
     models::{Project, Role, Status},
-    types::Pool,
-    utils::data,
+    types::{ColumnDataType, Db, Json},
+    utils::dataset_table_name,
 };
-use async_graphql::{Context, Result as GQLResult, ID};
+use async_graphql::{Context, Json as GQLJson, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Result as SQLxResult};
+use sqlx::{query, query_as, query_scalar, FromRow, Result as SQLxResult};
+use std::str;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, FromRow)]
@@ -23,7 +25,7 @@ pub struct Dataset {
 
 impl Dataset {
     pub async fn create(
-        pool: &Pool,
+        db: &Db,
         project_uuid: &Uuid,
         name: &str,
         uri: &str,
@@ -37,22 +39,18 @@ impl Dataset {
         .bind(project_uuid)
         .bind(name)
         .bind(uri)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
+    pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM datasets WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(pool)
+            .fetch_one(db)
             .await
     }
 
-    pub async fn rename(
-        pool: &Pool,
-        uuid: &Uuid,
-        name: &str,
-    ) -> SQLxResult<Self> {
+    pub async fn rename(db: &Db, uuid: &Uuid, name: &str) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE datasets
@@ -63,12 +61,12 @@ impl Dataset {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
     pub async fn role(
-        pool: &Pool,
+        db: &Db,
         uuid: &Uuid,
         user_uuid: &Uuid,
     ) -> SQLxResult<Role> {
@@ -84,15 +82,15 @@ impl Dataset {
         )
         .bind(&uuid)
         .bind(&user_uuid)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await?;
         Ok(row.0)
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
+    pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM datasets WHERE uuid = $1")
             .bind(uuid)
-            .execute(pool)
+            .execute(db)
             .await
             .map(|_| ())
     }
@@ -111,7 +109,7 @@ impl Dataset {
 
     pub async fn project(&self, ctx: &Context<'_>) -> GQLResult<Project> {
         let d = data(ctx)?;
-        Project::get(&d.pool, &self.project_uuid)
+        Project::get(&d.db, &self.project_uuid)
             .await
             .map_err(|e| e.into())
     }
@@ -122,5 +120,43 @@ impl Dataset {
 
     pub async fn status(&self) -> &Status {
         &self.status
+    }
+
+    pub async fn schema(
+        &self,
+        ctx: &Context<'_>,
+    ) -> GQLResult<Vec<ColumnDataType>> {
+        let d = data(ctx)?;
+        let table_name = dataset_table_name(&self.uuid);
+        query_as(
+            r#"
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_name = $1
+            "#,
+        )
+        .bind(&table_name)
+        .fetch_all(&d.data_db)
+        .await
+        .map_err(|e| e.into())
+    }
+
+    pub async fn sample_rows(
+        &self,
+        ctx: &Context<'_>,
+    ) -> GQLResult<GQLJson<Json>> {
+        let d = data(ctx)?;
+        let table_name = dataset_table_name(&self.uuid);
+        query_scalar::<_, Json>(&format!(
+            r#"
+            SELECT JSON_AGG(t)
+            FROM (SELECT * FROM {} TABLESAMPLE SYSTEM_ROWS(100)) t
+            "#,
+            &table_name
+        ))
+        .fetch_one(&d.data_db)
+        .await
+        .map(|v| GQLJson(v))
+        .map_err(|e| e.into())
     }
 }

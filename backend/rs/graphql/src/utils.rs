@@ -1,39 +1,21 @@
-use crate::{models::User, ContextData, Error, ModelKeys};
-use async_graphql::{Context, Result, ID};
+use crate::GenericError;
+use bytes::Bytes;
+use serde::Serialize;
 use std::str;
+use uuid::Uuid;
 
-pub fn current_user<'ctx>(ctx: &'ctx Context<'_>) -> Result<&'ctx User> {
-    let d = data(ctx)?;
-    match &d.user {
-        Some(user) => Ok(user),
-        None => Err(Error::InvalidPermissions.into()),
-    }
+pub fn as_bytes<T: Serialize>(v: &T) -> Result<Bytes, GenericError> {
+    Ok(Bytes::from(serde_json::to_vec(v)?))
 }
 
-pub fn data<'ctx>(ctx: &'ctx Context<'_>) -> Result<&'ctx ContextData> {
-    ctx.data::<ContextData>()
+pub fn dataset_table_name(uuid: &Uuid) -> String {
+    let uuid_str = str::replace(&uuid.to_string(), "-", "_");
+    format!("dataset_{}", uuid_str)
 }
 
-pub fn model_keys(id: ID) -> ModelKeys {
-    let model_keys = str::from_utf8(&base64::decode(id.to_string()).unwrap())
-        .unwrap()
-        .to_string()
-        .split(":")
-        .map(|v| v.to_string())
-        .collect::<Vec<String>>();
-    let (model, keys) = model_keys.split_first().unwrap();
-    ModelKeys {
-        model: model.to_string(),
-        keys: keys.to_vec(),
-    }
-}
-
-pub fn is_current_user(user: &User, ctx: &Context<'_>) -> Result<()> {
-    let curr_user = current_user(ctx)?;
-    if curr_user.uuid != user.uuid {
-        return Err(Error::InvalidPermissions.into());
-    }
-    Ok(())
+pub fn dataview_view_name(uuid: &Uuid) -> String {
+    let uuid_str = str::replace(&uuid.to_string(), "-", "_");
+    format!("dataview_{}", uuid_str)
 }
 
 pub fn user_name_from_email(email: &str) -> String {

@@ -13,7 +13,7 @@ class Nav extends ChangeNotifier {
   }
 
   Widget get body {
-    if (_names.isEmpty) {
+    if (_bodies.isEmpty) {
       throw new NavException();
     }
     return _bodies.last;

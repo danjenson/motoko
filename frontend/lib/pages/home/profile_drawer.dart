@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import '../../common/auth.dart';
@@ -20,6 +21,8 @@ class ProfileDrawer extends StatelessWidget {
   ''';
   @override
   Widget build(BuildContext context) {
+    var accentColor = Provider.of<AccentColor>(context, listen: false);
+    var auth = Provider.of<Auth>(context, listen: false);
     // TODO(danj): loading screen
     return Query(
         options: QueryOptions(
@@ -47,25 +50,29 @@ class ProfileDrawer extends StatelessWidget {
                           color: Theme.of(context).colorScheme.secondary)),
                 ]))),
                 Spacer(),
+                GestureDetector(
+                    child: ListTile(
+                        onTap: () {
+                          Clipboard.setData(
+                              ClipboardData(text: auth.accessToken));
+                        },
+                        leading: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.rotationY(math.pi),
+                          child: Icon(Icons.content_copy, size: size),
+                        ),
+                        title: Text('Access Key', style: textStyle))),
                 SwitchListTile(
-                  activeColor:
-                      Provider.of<AccentColor>(context, listen: false).second,
-                  inactiveTrackColor:
-                      Provider.of<AccentColor>(context, listen: false)
-                          .first
-                          .withOpacity(0.5),
-                  inactiveThumbColor:
-                      Provider.of<AccentColor>(context, listen: false).first,
-                  value:
-                      !Provider.of<AccentColor>(context, listen: false).isFirst,
+                  activeColor: accentColor.second,
+                  inactiveTrackColor: accentColor.first.withOpacity(0.5),
+                  inactiveThumbColor: accentColor.first,
+                  value: !accentColor.isFirst,
                   title: Text('Accent', style: textStyle),
-                  onChanged: (value) =>
-                      Provider.of<AccentColor>(context, listen: false).flip(),
+                  onChanged: (value) => accentColor.flip(),
                   secondary: Icon(Icons.brightness_4),
                 ),
                 ListTile(
-                    onTap: () =>
-                        Provider.of<Auth>(context, listen: false).logout(),
+                    onTap: () => auth.logout(),
                     leading: Transform(
                       alignment: Alignment.center,
                       transform: Matrix4.rotationY(math.pi),

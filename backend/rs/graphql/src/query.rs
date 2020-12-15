@@ -1,7 +1,7 @@
 use crate::{
+    gql::{current_user, data, graphql_id_to_uuid},
     id_to_node,
     models::{Analysis, Dataset, Dataview, Model, Plot, Statistic, User},
-    utils::{current_user, data, model_keys},
     Node,
 };
 use async_graphql::{Context, Result, ID};
@@ -20,7 +20,7 @@ impl Query {
 
     async fn node(&self, ctx: &Context<'_>, id: ID) -> Result<Node> {
         let d = data(ctx)?;
-        id_to_node(&d.pool, id).await
+        id_to_node(&d.db, &id).await
     }
 
     async fn datasets(
@@ -30,8 +30,7 @@ impl Query {
     ) -> Result<Vec<Dataset>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
         query_as(
             r#"
             SELECT d.*
@@ -46,7 +45,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&project_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }
@@ -58,8 +57,7 @@ impl Query {
     ) -> Result<Vec<Analysis>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
         query_as(
             r#"
             SELECT a.*
@@ -74,7 +72,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&project_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }
@@ -86,8 +84,7 @@ impl Query {
     ) -> Result<Vec<Dataset>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(project_id);
-        let project_uuid = mkeys.keys.first().unwrap();
+        let project_uuid = graphql_id_to_uuid(&project_id)?;
         query_as(
             r#"
             SELECT pur.*
@@ -100,7 +97,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&project_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }
@@ -112,8 +109,7 @@ impl Query {
     ) -> Result<Vec<Dataview>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(analysis_id);
-        let analysis_uuid = mkeys.keys.first().unwrap();
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
         query_as(
             r#"
             WITH RECURSIVE sub_dataviews AS (
@@ -137,7 +133,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&analysis_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }
@@ -149,8 +145,7 @@ impl Query {
     ) -> Result<Vec<Plot>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(analysis_id);
-        let analysis_uuid = mkeys.keys.first().unwrap();
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
         query_as(
             r#"
             SELECT pl.*
@@ -164,7 +159,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&analysis_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }
@@ -176,8 +171,7 @@ impl Query {
     ) -> Result<Vec<Statistic>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(analysis_id);
-        let analysis_uuid = mkeys.keys.first().unwrap();
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
         query_as(
             r#"
             SELECT s.*
@@ -191,7 +185,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&analysis_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }
@@ -203,8 +197,7 @@ impl Query {
     ) -> Result<Vec<Model>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let mkeys = model_keys(analysis_id);
-        let analysis_uuid = mkeys.keys.first().unwrap();
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
         query_as(
             r#"
             SELECT m.*
@@ -218,7 +211,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&analysis_uuid)
-        .fetch_all(&d.pool)
+        .fetch_all(&d.db)
         .await
         .map_err(|e| e.into())
     }

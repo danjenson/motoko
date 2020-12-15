@@ -3,27 +3,23 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- call infer from graphql lambda
-- lambdas:
-  - upload dataset with types
-  - calculate statistic
-  - plot
-  - transform data
-  - model
-- todo:
-  - allow cloning projects
-  - accounting to eliminate orphaned dataviews vs garbage collection?
-  - copy plots/stats/models when dataview updated
-  - type args instead of using Null/serde_json::Value
-- clean up lambda:
-  - clear stale refresh tokens
-  - clear orphaned dataviews
-  - clear orphaned datasets (even possible?)
-- errors:
-  - separate error messages for dev vs prod:
-    - https://doc.rust-lang.org/reference/conditional-compilation.html
-    - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
+- analysis
+- plot
+- calculate statistic
+- transform data
+- model
+- allow cloning projects
+- copy plots/stats/models when dataview updated
+- custom errors from lambda or API gateway if it doesn't even load
+- separate error messages for dev vs prod:
+  - https://doc.rust-lang.org/reference/conditional-compilation.html
+  - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
+- type args instead of using Null/serde_json::Value
+- create test databases for cloudbuild unittests
 - fix sliding up panel: https://github.com/akshathjain/sliding_up_panel/issues/193
+- async SAM invoke: https://github.com/aws/aws-sam-cli/pull/749
+- SAM invoke rust: https://github.com/aws/aws-lambda-runtime-interface-emulator/issues/11
+- Tokio-3 AWS Lambda - remove all .compat()
 - setup [RDS Proxy](https://aws.amazon.com/blogs/compute/using-amazon-rds-proxy-with-aws-lambda/)
   to manage connection pooling for lambdas
 - google auth submit for review
@@ -39,16 +35,61 @@
 ## Local Setup
 
 #### General
-- `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
-- `./install_motoko_command`
-- `motoko install aws`
-- `aws configure`
-  - [Users -> user -> Security Keys](https://console.aws.amazon.com/iam/home#/users)
-  - [Regions](https://docs.aws.amazon.com/general/latest/gr/rande.html)
-    (default to `us-west-1`, which is Northern California)
-  - output format: `json`
-- `motoko run setup-android-keystore`
-- `motoko -h`
+- `motoko` command
+  - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
+  - `./install_motoko_command`
+- lambdas:
+  - `sudo pacman -S musl # required to compile rust lambdas`
+- AWS:
+  - `motoko install aws`
+  - `aws configure`
+    - [Users -> danj -> Security credentials](https://console.aws.amazon.com/iam/home#/users)
+    - [Regions](https://docs.aws.amazon.com/general/latest/gr/rande.html)
+      (default to `us-west-1`, which is Northern California)
+    - output format: `json`
+  - `sudo pacman -S docker # required for SAM`
+  - `systemctl enable docker && systemctl start docker`
+  - `sudo usermod -a -G docker danj # requires reboot`
+- flutter:
+  - `motoko run setup-android-keystore`
+  - `motoko install flutter`
+  - `android-studio # install SDKs`
+    - install command line tools
+    - install dart and flutter plugins
+    - `flutter doctor`
+      - `flutter config --android-studio-dir /opt/android-studio`
+- add [sqlx cli](https://github.com/launchbadge/sqlx/tree/master/sqlx-cli):
+  - `cargo install --version=0.2.0 sqlx-cli --no-default-features --features postgres`
+- postgres:
+  - `pacman -S postgresql`
+  - `sudo -iu postgres`
+  - `initdb -D /var/lib/postgres/data`
+  - enable connections from Docker using AWS SAM:
+    - `vim /var/lib/postgres/data/postgresql.conf`
+      - `listen_addresses = '*'`
+    - `vim /var/lib/postgres/data/pg_hba.conf`
+      - `host	all	all	172.17.0.1/16	trust`
+  - `systemctl enable postgresql`
+  - `systemctl start postgresql`
+  - `psql -U postgres` or `backend/rs/graphql/connect_to_db.sh`
+  - `CREATE USER motoko WITH PASSWORD '<password>'  # check .env file`
+  - `CREATE DATABASE motoko`
+  - `GRANT ALL PRIVILEGES ON DATABASE motoko TO motoko;`
+  - `CREATE DATABASE motoko_data`
+  - `GRANT ALL PRIVILEGES ON DATABASE motoko_data TO motoko;`
+  - `CREATE EXTENSION IF NOT EXISTS tsm_system_rows;`
+  - `motoko run reset-databases`
+- setup backend dotenv: `motoko run setup-backend-dotenv`
+- run AWS SAM from `motoko/backend`:
+  - `sam local start-lambda`
+    - if you get `[Errno 28] No space left on device`, you need to increase
+      your /tmp directory as detailed [here](https://wiki.archlinux.org/index.php/tmpfs)
+    - can also temporarily run: `sudo mount -o remount,size=20G,noatime /tmp`
+  - Note that on Linux, the host IP is 172.17.0.1; calls from a rust test must
+    call lambda functions at 127.0.0.1:3001, but calls back to host from those
+    lambda functions must go through 172.17.0.1
+  - To test locally, run `motoko build sam`; the lambda functions need to be
+    built in order to be called by other testing scripts
 
 #### [Databases](https://us-west-1.console.aws.amazon.com/rds/home?region=us-west-1#database:id=motoko-free-tier;is-cluster=false)
 ##### AWS RDS creation:
@@ -57,22 +98,6 @@
 - Make sure `public accessibility` option is set to `Yes`
 - Make sure you assign a security group that permits TCP traffic to port 5432,
   like [this](https://us-west-1.console.aws.amazon.com/ec2/v2/home?region=us-west-1#SecurityGroups:search=motoko-free-tier)
-##### Setup
-- add sqlx cli:
-  - `cargo install --version=0.1.0-beta.1 sqlx-cli --no-default-features --features postgres`
-- setup database:
-  - `CREATE DATABASE motoko`
-  - `CREATE USER motoko WITH PASSWORD '<password>'  # check .env file`
-  - `GRANT ALL PRIVILEGES ON DATABASE motoko TO motoko;`
-- setup environment to connect:
-  - `vim motoko/backend/rs/gql/.env`:
-    - `ADDRESS=http://127.0.0.1:3000`
-    - `DATABASE_URL=postgres://motoko:<password>@localhost/motoko  # app client`
-      - comment and switch to alternate between local and AWS db
-    - `GOOGLE_OAUTH_CLIENT_ID=<ID>`
-    - `JWT_KEY=<key>`
-- run migrations:
-  - `sqlx migrate run`
 
 #### Simulators
 ##### Android
@@ -154,7 +179,7 @@
     `motoko run setup-android-keystore`, which does the following:
       - downloads the android keystore to
         `~/.keys/motoko/android/signing_key.jks`
-      - creates the file `motoko/android/key.properties`, which contains the
+      - creates the file `frontend/android/key.properties`, which contains the
         password to unlock the keystore (also from AWS Secrets Manager) and is
         used when building by gradle; do not add either of these files to the
         code repo
@@ -166,14 +191,15 @@
       - runs the same commands as `motoko run setup-android-keystore` to setup
         the local environment to use the new keys
       - __NOTE__: after a reset, you will need to run `./gradlew signingReport`
-        from the `motoko/android` directory and copy the debug and release SHA1
-        hashes into the OAuth2 clients configs:
+        from the `frontend/android` directory and copy the debug and
+        release SHA1 hashes into the OAuth2 clients configs:
         [motoko-android-debug](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-d95mopk70t0o0d9gphomcncu3961ge9s.apps.googleusercontent.com?project=motoko-286819)
         and
         [motoko-android-release](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-nk7lev14vc27gpa6o30c2o0mc25btmge.apps.googleusercontent.com?project=motoko-286819);
-        this lets google login know that builds using these signatures are
-        legitimate; if the hashes are incorrect, google will reject attempted
-        logins and return a `PlatformException` with error code `10`
+        then run `motoko run upload-debug-keystore`; this lets google login
+        know that builds using these signatures are legitimate; if the hashes
+        are incorrect, google will reject attempted logins and return a
+        `PlatformException` with error code `10`
 
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
@@ -224,8 +250,20 @@
           - dev.api.motoko.ai/graphql is mapped to the Lambda function
             [motoko-graphql-dev](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-dev?tab=configuration),
             which is also where environment variables should be specified
-##### NOTES:
+__NOTE__:
 - Integration Requests from API Gateway to Lambda Functions must have Proxy
   enabled.
 - CloudFront Forwarding should have TTL set to 0 under `Behaviors` for requests
   that shouldn't be cached
+- If you re-upload a lambda that had environment variables, you will need to
+  manually put them back in or you will get an internal server error
+- If you get this error `Error: NotPresent`, it's because you're missing an
+  environment variable
+- Lambdas require python 3.8 [2020-12-01], which can be install from AUR on
+  Arch Linux; if you are running 3.9 and use `--python-version 3.8`, it
+  requires setting `--only-binary :all:`, and (1) some packages don't have
+  binaries, (2) this leads to a larger deployment, which, incidentally, also
+  blows out the 128MB lambda function memory as well; better to install
+  python3.8 as the default version until AWS upgrades to 3.9
+- Make sure you set the timeout on the Lambdas to be sufficiently long,
+  especially on things like `motoko-uri-to-sql-db`

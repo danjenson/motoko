@@ -5,6 +5,7 @@ import 'storage.dart';
 import 'tier.dart';
 import 'error_dialog.dart';
 import 'utils.dart';
+import 'package:flutter/foundation.dart';
 
 enum Status { Uninitialized, Authenticated, Authenticating, Unauthenticated }
 
@@ -59,7 +60,7 @@ class Auth extends ChangeNotifier {
         _accessTokenExpiresAt == null ||
         _refreshToken == null ||
         _refreshTokenExpiresAt == null ||
-        _refreshTokenExpiresAt < timestamp()) {
+        refreshTokenHasExpired()) {
       _status = Status.Authenticating;
       clearCredentials();
       notifyListeners();
@@ -123,6 +124,7 @@ class Auth extends ChangeNotifier {
           variables: {'provider': 'GOOGLE', 'token': googleAuth.idToken});
       final res = await client().query(queryOpts);
       if (!res.loading) {
+        debugPrint(res.exception.toString());
         final creds = res.data['login'];
         _accessToken = creds['accessToken'];
         _refreshToken = creds['refreshToken'];

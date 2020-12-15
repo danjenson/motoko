@@ -3,13 +3,18 @@ import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 class PreviewPanel extends StatelessWidget {
   PreviewPanel(
-      {@required this.main, @required this.preview, this.title = 'preview'});
+      {@required this.main,
+      @required this.preview,
+      this.title = 'preview',
+      this.controller});
   final Widget main;
   final Widget preview;
   final String title;
+  final PanelController controller;
   @override
   Widget build(BuildContext context) {
     return SlidingUpPanel(
+        controller: controller,
         minHeight: 45,
         backdropEnabled: true,
         color: Theme.of(context).cardColor,

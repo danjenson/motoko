@@ -1,31 +1,27 @@
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    EmptySubscription, Schema,
+    Request as GQLRequest,
 };
 use graphql::{
-    auth::user_from_authorization_header, Auth, ContextData, Error, Mutation,
-    Query,
+    auth::user_from_authorization_header, respond, ContextData, Error,
+    GenericError,
 };
 use lambda_http::{
     handler,
-    lambda::{self, Context},
-    Body, Request, Response,
+    lambda::{self, Context as LambdaContext},
+    Body, Request as LambdaRequest, Response,
 };
-use sqlx::postgres::PgPoolOptions;
-use std::env;
 use tokio_compat_02::FutureExt;
-
-pub type GenericError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[tokio::main]
 async fn main() -> Result<(), GenericError> {
-    lambda::run(handler(graphql)).compat().await?;
+    lambda::run(handler(lambda_handler)).compat().await?;
     Ok(())
 }
 
-async fn graphql(
-    req: Request,
-    _: Context,
+async fn lambda_handler(
+    req: LambdaRequest,
+    _: LambdaContext,
 ) -> Result<Response<String>, GenericError> {
     if req.method().as_str() == "GET" {
         return Response::builder()
@@ -34,33 +30,24 @@ async fn graphql(
             .body(playground_source(GraphQLPlaygroundConfig::new("/graphql")))
             .map_err(|e| e.into());
     }
-    let google_oauth2_client_id = env::var("GOOGLE_OAUTH2_CLIENT_ID")?;
-    let jwt_secret = env::var("JWT_KEY")?;
-    let database_url = env::var("DATABASE_URL")?;
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await?;
-    let auth = req
+    let mut ctx = ContextData::default().await?;
+    let auth_header = req
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok());
-    let context_data = ContextData {
-        user: user_from_authorization_header(auth, &jwt_secret, &pool).await,
-        pool: pool,
-        auth: Auth {
-            jwt_secret,
-            google_oauth2_client_id,
-        },
-    };
-    let schema = Schema::new(Query, Mutation, EmptySubscription);
+    ctx.user = user_from_authorization_header(
+        auth_header,
+        &ctx.auth.jwt_secret,
+        &ctx.db,
+    )
+    .await;
     let payload = match req.body() {
         Body::Text(payload) => Ok(payload),
         _ => Err(Error::BadRequest),
     }?;
-    let gql_req: async_graphql::Request =
+    let gql_req: GQLRequest =
         serde_json::from_str(&payload).map_err(|_| Error::BadRequest)?;
-    let gql_res = schema.execute(gql_req.data(context_data)).await;
+    let gql_res = respond(gql_req, &ctx).await;
     let body = serde_json::to_string(&gql_res)
         .map_err(|e| -> GenericError { e.into() })?;
     Response::builder()
@@ -82,7 +69,7 @@ mod tests {
         let req = from_str(include_str!(
             "../../tests/data/apigw_v2_proxy_request.json"
         ))?;
-        let v = graphql(req, Context::default()).compat().await;
+        let v = lambda_handler(req, LambdaContext::default()).compat().await;
         assert!(v.is_err());
         Ok(())
     }
@@ -93,7 +80,7 @@ mod tests {
         let req = from_str(include_str!(
             "../../tests/data/apigw_v2_proxy_request_get.json"
         ))?;
-        let v = graphql(req, Context::default()).compat().await;
+        let v = lambda_handler(req, LambdaContext::default()).compat().await;
         assert!(v.is_ok());
         Ok(())
     }
@@ -104,7 +91,9 @@ mod tests {
         let req = from_str(include_str!(
             "../../tests/data/apigw_v2_proxy_request_me.json"
         ))?;
-        let v = graphql(req, Context::default()).compat().await?;
+        let v = lambda_handler(req, LambdaContext::default())
+            .compat()
+            .await?;
         let res: Response = serde_json::from_str(v.body())?;
         assert!(!res.errors.is_empty());
         Ok(())

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 import 'searchable_list.dart';
 import 'analysis.dart' as a;
 import 'nav.dart';

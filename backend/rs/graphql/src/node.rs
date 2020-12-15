@@ -1,12 +1,13 @@
 use crate::{
+    gql::{graphql_id_to_uuid, model_keys},
     models::{
         Analysis, Dataset, Dataview, Model, Plot, Project, ProjectUserRole,
         Statistic, User, UserRefreshToken,
     },
-    types::Pool,
-    utils::model_keys,
+    types::Db,
+    Error,
 };
-use async_graphql::{Interface, Result, ID};
+use async_graphql::{Error as GQLError, Interface, Result as GQLResult, ID};
 use uuid::Uuid;
 
 #[derive(Interface)]
@@ -24,60 +25,67 @@ pub enum Node {
     UserRefreshToken(UserRefreshToken),
 }
 
-pub async fn id_to_node(pool: &Pool, id: ID) -> Result<Node> {
-    let mkeys = model_keys(id);
-    let pk1 = mkeys.keys.first().unwrap();
+pub async fn id_to_node(db: &Db, id: &ID) -> GQLResult<Node> {
+    let mkeys = model_keys(&id)?;
 
     match mkeys.model.as_str() {
         "Analysis" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let analysis = Analysis::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let analysis = Analysis::get(db, &uuid).await?;
             Ok(Node::Analysis(analysis))
         }
         "Dataset" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let dataset = Dataset::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let dataset = Dataset::get(db, &uuid).await?;
             Ok(Node::Dataset(dataset))
         }
         "Dataview" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let dataview = Dataview::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let dataview = Dataview::get(db, &uuid).await?;
             Ok(Node::Dataview(dataview))
         }
         "Model" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let model = Model::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let model = Model::get(db, &uuid).await?;
             Ok(Node::Model(model))
         }
         "Plot" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let plot = Plot::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let plot = Plot::get(db, &uuid).await?;
             Ok(Node::Plot(plot))
         }
         "Project" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let project = Project::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let project = Project::get(db, &uuid).await?;
             Ok(Node::Project(project))
         }
         "ProjectUserRole" => {
-            let project_uuid = Uuid::parse_str(pk1)?;
-            let user_uuid = Uuid::parse_str(mkeys.keys.get(1).unwrap())?;
-            let pur =
-                ProjectUserRole::get(pool, &project_uuid, &user_uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let user_key = mkeys
+                .keys
+                .get(1)
+                .ok_or::<GQLError>(Error::InvalidGraphQLID.into())?;
+            let user_uuid = Uuid::parse_str(user_key)
+                .map_err(|_| -> GQLError { Error::InvalidGraphQLID.into() })?;
+            let pur = ProjectUserRole::get(db, &uuid, &user_uuid).await?;
             Ok(Node::ProjectUserRole(pur))
         }
         "Statistic" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let stat = Statistic::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let stat = Statistic::get(db, &uuid).await?;
             Ok(Node::Statistic(stat))
         }
         "User" => {
-            let uuid = Uuid::parse_str(pk1)?;
-            let user = User::get(pool, &uuid).await?;
+            let uuid = graphql_id_to_uuid(&id)?;
+            let user = User::get(db, &uuid).await?;
             Ok(Node::User(user))
         }
         "UserRefreshToken" => {
-            let token = UserRefreshToken::get(pool, pk1).await?;
+            let value = mkeys
+                .keys
+                .first()
+                .ok_or::<GQLError>(Error::InvalidGraphQLID.into())?;
+            let token = UserRefreshToken::get(db, value).await?;
             Ok(Node::UserRefreshToken(token))
         }
         _ => Err("invalid data type".into()),

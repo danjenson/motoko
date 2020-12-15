@@ -1,4 +1,4 @@
-use crate::{models::User, types::Pool, utils::data};
+use crate::{gql::data, models::User, types::Db};
 use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
 use node_derive::node;
@@ -15,7 +15,7 @@ pub struct UserRefreshToken {
 
 impl UserRefreshToken {
     pub async fn create(
-        pool: &Pool,
+        db: &Db,
         user_uuid: &Uuid,
         value: &str,
         expires_at: &DateTime<Utc>,
@@ -29,21 +29,21 @@ impl UserRefreshToken {
         .bind(user_uuid)
         .bind(value)
         .bind(expires_at)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
-    pub async fn get(pool: &Pool, value: &str) -> SQLxResult<Self> {
+    pub async fn get(db: &Db, value: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM user_refresh_tokens WHERE value = $1")
             .bind(value)
-            .fetch_one(pool)
+            .fetch_one(db)
             .await
     }
 
-    pub async fn delete(&self, pool: &Pool) -> SQLxResult<()> {
+    pub async fn delete(db: &Db, value: &str) -> SQLxResult<()> {
         query("DELETE FROM user_refresh_tokens WHERE value = $1")
-            .bind(&self.value)
-            .execute(pool)
+            .bind(value)
+            .execute(db)
             .await
             .map(|_| ())
     }
@@ -54,7 +54,7 @@ impl UserRefreshToken {
 impl UserRefreshToken {
     pub async fn user(&self, ctx: &Context<'_>) -> GQLResult<User> {
         let d = data(ctx)?;
-        User::get(&d.pool, &self.user_uuid)
+        User::get(&d.db, &self.user_uuid)
             .await
             .map_err(|e| e.into())
     }

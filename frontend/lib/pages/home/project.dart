@@ -12,8 +12,8 @@ class Project extends StatelessWidget {
           AdaptiveButtonData(
               icon: Icons.storage,
               name: 'datasets',
-              onTap: () => nav.push(
-                  'datasets', d.Datasets(projectID: projectID), d.add)),
+              onTap: () => nav.push('datasets',
+                  d.Datasets(projectID: projectID), d.makeAdder(projectID))),
           AdaptiveButtonData(
               icon: Icons.assessment,
               name: 'analyses',

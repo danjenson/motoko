@@ -1,4 +1,4 @@
-use crate::{models::User, Error, Pool};
+use crate::{models::User, Db, Error};
 use async_graphql::{Enum, Error as GQLError, Result, SimpleObject};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, DecodingKey, Validation};
@@ -91,11 +91,11 @@ pub fn credentials_for_user(
 pub async fn user_from_authorization_header(
     authorization_header: Option<&str>,
     jwt_secret: &str,
-    pool: &Pool,
+    db: &Db,
 ) -> Option<User> {
     let token = extract_bearer_token(authorization_header?)?;
     let user_uuid = user_uuid_from_token(&token, jwt_secret).ok()?;
-    User::get(pool, &user_uuid).await.ok()
+    User::get(db, &user_uuid).await.ok()
 }
 
 pub fn extract_bearer_token(authorization_header: &str) -> Option<String> {

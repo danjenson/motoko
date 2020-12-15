@@ -10,10 +10,10 @@ use std::env;
 use tokio_compat_02::FutureExt;
 
 #[tokio::test]
-async fn round_trip() -> Result<(), Error> {
+async fn db_round_trip() -> Result<(), Error> {
     // setup
     dotenv().ok();
-    let pool = PgPoolOptions::new()
+    let db = PgPoolOptions::new()
         .max_connections(5)
         .connect(&env::var("DATABASE_URL")?)
         .compat()
@@ -21,21 +21,21 @@ async fn round_trip() -> Result<(), Error> {
 
     // user
     let user =
-        User::create(&pool, "Motoko Kusanagi", "motoko", "motoko@motoko.ai")
+        User::create(&db, "Motoko Kusanagi", "motoko", "motoko@motoko.ai")
             .await?;
 
     // get user
-    let same_user = User::get(&pool, &user.uuid).await?;
+    let same_user = User::get(&db, &user.uuid).await?;
 
     // eq
     assert_eq!(user, same_user);
 
     // project
-    let project = Project::create(&pool, "project 1", &user.uuid).await?;
+    let project = Project::create(&db, "project 1", &user.uuid).await?;
 
     // dataset
     let dataset = Dataset::create(
-        &pool,
+        &db,
         &project.uuid,
         "dataset 1",
         "http://motoko.ai/test_dataset.csv",
@@ -43,7 +43,7 @@ async fn round_trip() -> Result<(), Error> {
     .await?;
 
     // analysis
-    let analysis = Analysis::create(&pool, &dataset.uuid, "analysis 1").await?;
+    let analysis = Analysis::create(&db, &dataset.uuid, "analysis 1").await?;
 
     // dataview transformation
     let mut op_args = JMap::new();
@@ -51,7 +51,7 @@ async fn round_trip() -> Result<(), Error> {
     op_args.insert("comparator".into(), ">".into());
     op_args.insert("value".into(), 5.into());
     let dataview = Dataview::create(
-        &pool,
+        &db,
         &analysis.dataview_uuid,
         &Operation::Filter,
         &op_args.into(),
@@ -59,14 +59,14 @@ async fn round_trip() -> Result<(), Error> {
     .await?;
 
     // analysis update
-    Analysis::point_to(&pool, &analysis.uuid, &dataview.uuid).await?;
+    Analysis::point_to(&db, &analysis.uuid, &dataview.uuid).await?;
 
     // statistic
     let mut stat_args = JMap::new();
     stat_args.insert("a".into(), "column_1".into());
     stat_args.insert("b".into(), "column_2".into());
     Statistic::create(
-        &pool,
+        &db,
         &dataview.uuid,
         &StatisticName::Correlation,
         &stat_args.into(),
@@ -78,7 +78,7 @@ async fn round_trip() -> Result<(), Error> {
     plot_args.insert("x".into(), "column_1".into());
     plot_args.insert("y".into(), "column_2".into());
     Plot::create(
-        &pool,
+        &db,
         &dataview.uuid,
         "plot 1",
         &PlotType::Scatter,
@@ -88,7 +88,7 @@ async fn round_trip() -> Result<(), Error> {
 
     // model
     let model = Model::create(
-        &pool,
+        &db,
         &dataview.uuid,
         "model 1",
         &Some("target".into()),
@@ -98,13 +98,13 @@ async fn round_trip() -> Result<(), Error> {
     .await?;
 
     // delete project (should cascade)
-    Project::delete(&pool, &project.uuid).await?;
+    Project::delete(&db, &project.uuid).await?;
 
     // confirm associated model has been deleted
-    assert!(Model::get(&pool, &model.uuid).await.is_err());
+    assert!(Model::get(&db, &model.uuid).await.is_err());
 
     // delete user
-    User::delete(&pool, &user.uuid).await?;
+    User::delete(&db, &user.uuid).await?;
 
     Ok(())
 }

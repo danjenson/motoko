@@ -7,26 +7,26 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-graphql = "2.1.5"
+async-graphql = "2.1.8"
 base64 = "0.13.0"
 bytes = "0.5.6"
 chrono = { version = "0.4.19", features = ["serde"] }
+dotenv = "0.15.0"
 jsonwebtoken = "7.2.0"
 lambda_http = { version = "0.2.0-beta.1", git = "https://github.com/awslabs/aws-lambda-rust-runtime" }
 lazy_static = "1.4.0"
 node_derive = { path = "node_derive" }
 regex = "1.4.2"
-reqwest = { version = "0.10.9", features = ["json"] }
-rusoto_core = "0.45.0"
-rusoto_lambda = "0.45.0"
+reqwest = { version = "0.10.9", default-features=false, features = ["json", "rustls-tls"] }
+rusoto_core = { version = "0.45.0", default-features=false, features=["rustls"] }
+rusoto_lambda = { version = "0.45.0", default-features=false, features=["rustls"] }
 serde = "1.0.117"
 serde_json = "1.0.59"
 sqlx = { version = "0.4.1", features = ["runtime-tokio-rustls", "json", "postgres", "uuid", "chrono", "macros", "offline"] }
 thiserror = "1.0.22"
-tokio = { version = "0.3.4", default-features = false, features = ["macros", "rt-multi-thread", "time", "stream"] }
+tokio = { version = "0.3.4", features = ["full"] }
 tokio-compat-02 = "0.1.2"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
 anyhow = "1.0.34"
-dotenv = "0.15.0"

@@ -1,7 +1,7 @@
 use crate::{
+    gql::data,
     models::{Dataset, Dataview, Role},
-    types::Pool,
-    utils::data,
+    types::Db,
 };
 use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
@@ -22,7 +22,7 @@ pub struct Analysis {
 
 impl Analysis {
     pub async fn create(
-        pool: &Pool,
+        db: &Db,
         dataset_uuid: &Uuid,
         name: &str,
     ) -> SQLxResult<Self> {
@@ -42,22 +42,18 @@ impl Analysis {
         .bind(dataset_uuid)
         .bind(Uuid::new_v4())
         .bind(name)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
-    pub async fn get(pool: &Pool, uuid: &Uuid) -> SQLxResult<Self> {
+    pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM analyses WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(pool)
+            .fetch_one(db)
             .await
     }
 
-    pub async fn rename(
-        pool: &Pool,
-        uuid: &Uuid,
-        name: &str,
-    ) -> SQLxResult<Self> {
+    pub async fn rename(db: &Db, uuid: &Uuid, name: &str) -> SQLxResult<Self> {
         query_as(
             r#"
             UPDATE analyses
@@ -68,12 +64,12 @@ impl Analysis {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
     pub async fn role(
-        pool: &Pool,
+        db: &Db,
         uuid: &Uuid,
         user_uuid: &Uuid,
     ) -> SQLxResult<Role> {
@@ -92,13 +88,13 @@ impl Analysis {
         )
         .bind(&uuid)
         .bind(&user_uuid)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await?;
         Ok(row.0)
     }
 
     pub async fn point_to(
-        pool: &Pool,
+        db: &Db,
         uuid: &Uuid,
         dataview_uuid: &Uuid,
     ) -> SQLxResult<Self> {
@@ -112,14 +108,14 @@ impl Analysis {
         )
         .bind(uuid)
         .bind(dataview_uuid)
-        .fetch_one(pool)
+        .fetch_one(db)
         .await
     }
 
-    pub async fn delete(pool: &Pool, uuid: &Uuid) -> SQLxResult<()> {
+    pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM datasets WHERE uuid = $1")
             .bind(uuid)
-            .execute(pool)
+            .execute(db)
             .await
             .map(|_| ())
     }
@@ -138,14 +134,14 @@ impl Analysis {
 
     pub async fn dataset(&self, ctx: &Context<'_>) -> GQLResult<Dataset> {
         let d = data(ctx)?;
-        Dataset::get(&d.pool, &self.dataset_uuid)
+        Dataset::get(&d.db, &self.dataset_uuid)
             .await
             .map_err(|e| e.into())
     }
 
     pub async fn dataview(&self, ctx: &Context<'_>) -> GQLResult<Dataview> {
         let d = data(ctx)?;
-        Dataview::get(&d.pool, &self.dataview_uuid)
+        Dataview::get(&d.db, &self.dataview_uuid)
             .await
             .map_err(|e| e.into())
     }

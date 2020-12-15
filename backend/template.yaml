@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: motoko-backend
+
+Globals:
+  Function:
+    Timeout: 5
+
+Resources:
+  MotokoGraphQL:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-graphql
+      CodeUri: rs/graphql
+      Handler: bootstrap.is.real.handler
+      Runtime: provided
+    Metadata:
+      BuildMethod: makefile
+  MotokoGarbageCollect:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-garbage-collect
+      CodeUri: rs/graphql
+      Handler: bootstrap.is.real.handler
+      Runtime: provided
+    Metadata:
+      BuildMethod: makefile
+  MotokoURIToSQLDB:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-uri-to-sql-db
+      CodeUri: py/uri-to-sql-db
+      Handler: main.lambda_handler
+      Runtime: python3.8
+  NetworkIntrospection:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: network-introspection
+      CodeUri: py/network-introspection
+      Handler: main.lambda_handler
+      Runtime: python3.8

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-typedef String Getter(dynamic w);
+import '../../common/types.dart';
 
 class SearchableList extends StatefulWidget {
   final List<Widget> items;
@@ -31,7 +30,7 @@ class _SearchableListState extends State<SearchableList> {
                   hasFiltered = true;
                 });
               },
-              style: TextStyle(fontSize: 20),
+              style: TextStyle(fontSize: 25),
               decoration: InputDecoration(
                   hintText: "Search", prefixIcon: Icon(Icons.search))),
           padding: EdgeInsets.fromLTRB(25, 10, 25, 10)),

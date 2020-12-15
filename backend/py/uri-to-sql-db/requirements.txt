@@ -1,3 +1,3 @@
 pandas
+psycopg2_binary
 sqlalchemy
-sqlalchemy-utils
