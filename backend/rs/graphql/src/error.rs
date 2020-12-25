@@ -1,3 +1,4 @@
+use crate::models::Status;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -5,10 +6,11 @@ use std::fmt;
 pub enum Error {
     BadRequest,
     InvalidGraphQLID,
-    InvalidIDToken,
+    InvalidIDToken(String),
     InvalidPermissions,
     RequiresAdminPermissions,
     RequiresEditorPermissions,
+    ResultUnavailable(Status),
     Serde,
     UnsupportedOperation,
 }
@@ -16,15 +18,22 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let v = match self {
-            Error::BadRequest => "Bad Request",
-            Error::InvalidGraphQLID => "Invalid GraphQL ID",
-            Error::InvalidIDToken => "Invalid ID Token",
-            Error::InvalidPermissions => "Invalid Permissions",
-            Error::RequiresAdminPermissions => "Requires Admin privileges",
-            Error::RequiresEditorPermissions => "Requires Editor privileges",
-            Error::Serde => "Error (de)serializing",
-            Error::UnsupportedOperation => "Unsupported Operation",
+            Error::BadRequest => "Bad Request".into(),
+            Error::InvalidGraphQLID => "Invalid GraphQL ID".into(),
+            Error::InvalidIDToken(msg) => format!("Invalid ID Token: {}", msg),
+            Error::InvalidPermissions => "Invalid Permissions".into(),
+            Error::RequiresAdminPermissions => {
+                "Requires Admin privileges".into()
+            }
+            Error::RequiresEditorPermissions => {
+                "Requires Editor privileges".into()
+            }
+            Error::ResultUnavailable(status) => {
+                format!("Result unavailable; status: {:?}", status)
+            }
+            Error::Serde => "Error (de)serializing".into(),
+            Error::UnsupportedOperation => "Unsupported Operation".into(),
         };
-        write!(f, "{}", v)
+        write!(f, "{}", &v)
     }
 }

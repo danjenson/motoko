@@ -19,6 +19,7 @@ use uuid::Uuid;
 )]
 #[sqlx(rename = "DATAVIEW_OPERATION")]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Operation {
     Create,
     Filter,
@@ -64,14 +65,14 @@ impl Dataview {
         .bind(dataview_uuid)
         .bind(operation)
         .bind(args)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM dataviews WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
@@ -97,7 +98,7 @@ impl Dataview {
         )
         .bind(uuid)
         .bind(user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await?;
         Ok(row.0)
     }
@@ -105,7 +106,7 @@ impl Dataview {
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM dataviews WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }
@@ -162,7 +163,7 @@ impl Dataview {
             "#,
         )
         .bind(&table_name)
-        .fetch_all(&d.data_db)
+        .fetch_all(&d.db.data)
         .await
         .map_err(|e| e.into())
     }
@@ -176,11 +177,11 @@ impl Dataview {
         query_scalar::<_, Json>(&format!(
             r#"
             SELECT JSON_AGG(t)
-            FROM (SELECT * FROM {} TABLESAMPLE SYSTEM_ROWS(100)) t
+            FROM (SELECT * FROM {} LIMIT 100) t
             "#,
             &view
         ))
-        .fetch_one(&d.data_db)
+        .fetch_one(&d.db.data)
         .await
         .map(|v| GQLJson(v))
         .map_err(|e| e.into())

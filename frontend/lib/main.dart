@@ -1,17 +1,20 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'common/accent_color.dart';
 import 'common/auth.dart';
 import 'common/gql.dart';
 import 'common/storage.dart';
 import 'common/theme.dart';
 import 'common/tier.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'pages/home/home_page.dart';
 import 'pages/login/login_page.dart';
 import 'pages/privacy/privacy_page.dart';
 import 'pages/splash/splash_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(App());
 }
 

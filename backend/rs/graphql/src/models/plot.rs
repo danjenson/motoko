@@ -1,7 +1,8 @@
 use crate::{
     gql::data,
     models::{Dataview, Role, Status},
-    types::Db,
+    utils::get_presigned_url,
+    Db, Error,
 };
 use async_graphql::{Context, Enum, Json as GQLJson, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
@@ -17,6 +18,7 @@ use uuid::Uuid;
 #[graphql(name = "PlotType")]
 #[sqlx(rename = "PLOT_TYPE")]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Type {
     Bar,
     Histogram,
@@ -36,7 +38,6 @@ pub struct Plot {
     pub type_: Type,
     pub args: Json,
     pub status: Status,
-    pub uri: Option<String>,
 }
 
 impl Plot {
@@ -57,29 +58,15 @@ impl Plot {
         .bind(name)
         .bind(type_)
         .bind(args)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
-        query_as(
-            r#"
-            SELECT
-                created_at,
-                updated_at,
-                dataview_uuid,
-                uuid,
-                name,
-                type as "type_: Type",
-                args,
-                status as "status: Status",
-                uri
-            FROM plots
-            WHERE uuid = $1"#,
-        )
-        .bind(uuid)
-        .fetch_one(db)
-        .await
+        query_as("SELECT * FROM plots WHERE uuid = $1")
+            .bind(uuid)
+            .fetch_one(&db.meta)
+            .await
     }
 
     pub async fn rename(db: &Db, uuid: &Uuid, name: &str) -> SQLxResult<Self> {
@@ -93,7 +80,7 @@ impl Plot {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -121,7 +108,7 @@ impl Plot {
         )
         .bind(uuid)
         .bind(user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await?;
         Ok(row.0)
     }
@@ -129,7 +116,7 @@ impl Plot {
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM plots WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }
@@ -170,7 +157,17 @@ impl Plot {
         &self.status
     }
 
-    pub async fn uri(&self) -> &Option<String> {
-        &self.uri
+    pub async fn uri(&self, ctx: &Context<'_>) -> GQLResult<String> {
+        if self.status != Status::Completed {
+            return Err(Error::ResultUnavailable(self.status).into());
+        }
+        let d = data(ctx)?;
+        let key = format!("plots/{}.svg", &self.uuid.to_string());
+        Ok(get_presigned_url(
+            &d.storage.region,
+            &d.storage.bucket,
+            &key,
+            &d.auth.aws_credentials,
+        ))
     }
 }

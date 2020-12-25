@@ -7,6 +7,7 @@ pub mod mutation;
 pub mod node;
 pub mod queries;
 pub mod query;
+pub mod secrets;
 pub mod types;
 pub mod utils;
 
@@ -17,4 +18,5 @@ pub use gql::respond;
 pub use mutation::Mutation;
 pub use node::{id_to_node, Node};
 pub use query::Query;
-pub use types::{Db, GenericError, ModelKeys};
+pub use secrets::Secrets;
+pub use types::*;

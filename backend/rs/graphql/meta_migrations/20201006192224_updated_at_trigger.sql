@@ -9,7 +9,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
 BEGIN
     IF (
-        NEW IS DISTINCT FROM OLD AND
+        to_jsonb(NEW) IS DISTINCT FROM to_jsonb(OLD) AND
         NEW.updated_at IS NOT DISTINCT FROM OLD.updated_at
     ) THEN
         NEW.updated_at := current_timestamp;

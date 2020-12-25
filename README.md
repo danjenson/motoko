@@ -3,8 +3,7 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- analysis
-- plot
+- remove dropdownmenu flutter dependency
 - calculate statistic
 - transform data
 - model
@@ -20,6 +19,8 @@
 - async SAM invoke: https://github.com/aws/aws-sam-cli/pull/749
 - SAM invoke rust: https://github.com/aws/aws-lambda-runtime-interface-emulator/issues/11
 - Tokio-3 AWS Lambda - remove all .compat()
+- dev tier adds to event object, enabling features
+- Dropdown menu borders
 - setup [RDS Proxy](https://aws.amazon.com/blogs/compute/using-amazon-rds-proxy-with-aws-lambda/)
   to manage connection pooling for lambdas
 - google auth submit for review
@@ -111,7 +112,8 @@
   - click Play Store version to update
 
 ## Infrastructure
-- Frontend uses [flutter](https://flutter.dev/), which is written in dart
+- Frontend uses [flutter](https://flutter.dev/), which is written in dart, here
+  is the [style guide](https://dart.dev/guides/language/effective-dart/style)
 - Backend uses API Gateway and Lambda Functions; most code is written in rust
   or python
 
@@ -184,11 +186,11 @@
         used when building by gradle; do not add either of these files to the
         code repo
   - to reset the keystore in AWS Secrets Manager, run `motoko run
-    reset-android-keystore`, which does the following:
+    reset-android-keystores`, which does the following:
       - generates a new keystore and uploads it to AWS Secrets Manager with the
-        key `android_keystore` along with the password under the key
-        `android_keystore_password`
-      - runs the same commands as `motoko run setup-android-keystore` to setup
+        key `android_{release,debug}_keystore` along with the password under
+        the key `android_keystore_password`
+      - runs the same commands as `motoko run setup-android-keystores` to setup
         the local environment to use the new keys
       - __NOTE__: after a reset, you will need to run `./gradlew signingReport`
         from the `frontend/android` directory and copy the debug and
@@ -196,10 +198,9 @@
         [motoko-android-debug](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-d95mopk70t0o0d9gphomcncu3961ge9s.apps.googleusercontent.com?project=motoko-286819)
         and
         [motoko-android-release](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-nk7lev14vc27gpa6o30c2o0mc25btmge.apps.googleusercontent.com?project=motoko-286819);
-        then run `motoko run upload-debug-keystore`; this lets google login
-        know that builds using these signatures are legitimate; if the hashes
-        are incorrect, google will reject attempted logins and return a
-        `PlatformException` with error code `10`
+        this lets google login know that builds using these signatures are
+        legitimate; if the hashes are incorrect, google will reject attempted
+        logins and return a `PlatformException` with error code `10`
 
 ## Topography
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
@@ -211,46 +212,27 @@
     - motoko.ai:
       - mapped to this [CloudFront
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E2CR4IH7H1BW7N)
-        - re-routes traffic from motoko.ai/graphql to api.motoko.ai/graphql
-        - re-routes traffic from motoko.ai/install/* to
-          [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-prod-mobile/?region=us-west-1)
-        - re-routes traffic from motoko.ai/* to S3 bucket
-          [motoko-prod-www](https://console.aws.amazon.com/s3/buckets/motoko-prod-www/?region=us-west-1&tab=overview):
+        - re-routes traffic from motoko.ai/graphql to the `prod` stage of API
+          Gateway's [motoko-api](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/5rr0s7ncpd/resources/cn0wjvae56)
+        - re-routes traffic from motoko.ai/* and motoko.ai/install/* to prod/*
+          and prod/install/* in the
+          [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1)
           - allows access by OAI (Origin Access Identity) to CloudFront
-            distribution in [bucket policy](https://console.aws.amazon.com/s3/buckets/motoko-prod-www/?region=us-west-1&tab=permissions)
-    - api.motoko.ai:
-      - mapped to API Gateway
-        [api.motoko.ai](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/plot4b3ymh/resources/pmgogvsld8):
-        - edge-optimized gateway has an AWS managed CloudFront distribution
-          that is mapped to the custom domain api.motoko.ai
-          [here](https://us-west-1.console.aws.amazon.com/apigateway/main/publish/domain-names?domain=api.motoko.ai&region=us-west-1),
-          which is mapped to the `prod` stage of the gateway:
-          - api.motoko.ai/graphql is mapped to the Lambda function
-            [motoko-graphql-prod](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-prod?tab=configuration),
-            which is also where environment variables should be specified
+            distribution in [bucket
+            policy](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1&tab=permissions)
     - dev.motoko.ai:
       - mapped to this [CloudFront
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E1O86QQ54GNZCY)
-        - re-routes traffic from dev.motoko.ai/graphql to
-          api.dev.motoko.ai/graphql
-        - re-routes traffic from motoko.ai/install/* to
-          [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-dev-mobile/?region=us-west-1)
-        - re-routes traffic from dev.motoko.ai/* to S3 bucket
-          [motoko-dev-www](https://console.aws.amazon.com/s3/buckets/motoko-dev-www/?region=us-west-1&tab=overview):
+        - re-routes traffic from dev.motoko.ai/graphql to the `dev` stage of API
+          Gateway's [motoko-api](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/5rr0s7ncpd/resources/cn0wjvae56)
+        - re-routes traffic from motoko.ai/* and motoko.ai/install/* to dev/*
+          and dev/install/* in the
+          [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1)
           - allows access by OAI (Origin Access Identity) to CloudFront
             distribution in [bucket
-            policy](https://console.aws.amazon.com/s3/buckets/motoko-dev-www/?region=us-west-1&tab=permissions)
-    - api.dev.motoko.ai:
-      - mapped to API Gateway
-        [dev.api.motoko.ai](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/cxcbzd3q0d/resources/gomvi9ciy9):
-        - edge-optimized gateway has an AWS managed CloudFront distribution
-          that is mapped to the custom domain api.dev.motoko.ai
-          [here](https://us-west-1.console.aws.amazon.com/apigateway/main/publish/domain-names?domain=api.dev.motoko.ai&region=us-west-1),
-          which is mapped to the `dev` stage of the gateway:
-          - dev.api.motoko.ai/graphql is mapped to the Lambda function
-            [motoko-graphql-dev](https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/motoko-graphql-dev?tab=configuration),
-            which is also where environment variables should be specified
-__NOTE__:
+            policy](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1&tab=permissions)
+
+__GOTCHAS__:
 - Integration Requests from API Gateway to Lambda Functions must have Proxy
   enabled.
 - CloudFront Forwarding should have TTL set to 0 under `Behaviors` for requests
@@ -267,3 +249,12 @@ __NOTE__:
   python3.8 as the default version until AWS upgrades to 3.9
 - Make sure you set the timeout on the Lambdas to be sufficiently long,
   especially on things like `motoko-uri-to-sql-db`
+- If a lambda request is taking a long time, check to see whether it is using
+  all it's memory and upgrade it if necessary
+- If you get weird errors like
+  [this](https://github.com/danvick/flutter_form_builder/issues/655), try
+  upgrading gradle or android build tools
+- If lambdas start failing, check that you haven't used all database
+  connections:
+  - `select usename from pg_stat_activity;`
+  - `select pg_terminate_backend(pid) from pg_stat_activity where usename='motoko';`

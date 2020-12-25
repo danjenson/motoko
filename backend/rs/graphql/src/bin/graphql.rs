@@ -50,6 +50,8 @@ async fn lambda_handler(
     let gql_res = respond(gql_req, &ctx).await;
     let body = serde_json::to_string(&gql_res)
         .map_err(|e| -> GenericError { e.into() })?;
+    ctx.db.meta.close().await;
+    ctx.db.data.close().await;
     Response::builder()
         .header("Content-Type", "application/json")
         .body(body)
@@ -60,12 +62,12 @@ async fn lambda_handler(
 mod tests {
     use super::*;
     use async_graphql::Response;
-    use dotenv::dotenv;
     use lambda_http::request::from_str;
+    use std::env;
 
     #[tokio::test]
     async fn bad_request() -> Result<(), GenericError> {
-        dotenv().ok();
+        env::set_var("RUN_MODE", "local");
         let req = from_str(include_str!(
             "../../tests/data/apigw_v2_proxy_request.json"
         ))?;
@@ -76,7 +78,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_playground() -> Result<(), GenericError> {
-        dotenv().ok();
+        env::set_var("RUN_MODE", "local");
         let req = from_str(include_str!(
             "../../tests/data/apigw_v2_proxy_request_get.json"
         ))?;
@@ -87,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn me_not_logged_in() -> Result<(), GenericError> {
-        dotenv().ok();
+        env::set_var("RUN_MODE", "local");
         let req = from_str(include_str!(
             "../../tests/data/apigw_v2_proxy_request_me.json"
         ))?;

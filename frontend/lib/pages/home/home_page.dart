@@ -47,10 +47,10 @@ class HomePage extends StatelessWidget {
               bottomNavigationBar: NavBreadcrumb(nav: nav),
               floatingActionButton: nav.add != null
                   ? FloatingActionButton(
+                      elevation: 0.0,
                       onPressed: () => nav.add(context),
                       tooltip: 'add',
-                      child: Icon(Icons.add),
-                    )
+                      child: Icon(Icons.add))
                   : SizedBox.shrink()));
     }));
   }

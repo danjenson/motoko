@@ -29,21 +29,21 @@ impl UserRefreshToken {
         .bind(user_uuid)
         .bind(value)
         .bind(expires_at)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, value: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM user_refresh_tokens WHERE value = $1")
             .bind(value)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
     pub async fn delete(db: &Db, value: &str) -> SQLxResult<()> {
         query("DELETE FROM user_refresh_tokens WHERE value = $1")
             .bind(value)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }

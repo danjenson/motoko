@@ -12,7 +12,12 @@ class ErrorDialog extends StatelessWidget {
   ErrorDialog(this.message);
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.secondary;
     return AlertDialog(
+        elevation: 0.0,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(width: 1.0, color: color)),
         title: Text('Error',
             textAlign: TextAlign.center,
             style: TextStyle(color: Theme.of(context).colorScheme.secondary)),

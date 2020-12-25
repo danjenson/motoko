@@ -39,14 +39,14 @@ impl Dataset {
         .bind(project_uuid)
         .bind(name)
         .bind(uri)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM datasets WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
@@ -61,7 +61,7 @@ impl Dataset {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -82,7 +82,7 @@ impl Dataset {
         )
         .bind(&uuid)
         .bind(&user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await?;
         Ok(row.0)
     }
@@ -90,7 +90,7 @@ impl Dataset {
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM datasets WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }
@@ -136,7 +136,7 @@ impl Dataset {
             "#,
         )
         .bind(&table_name)
-        .fetch_all(&d.data_db)
+        .fetch_all(&d.db.data)
         .await
         .map_err(|e| e.into())
     }
@@ -154,7 +154,7 @@ impl Dataset {
             "#,
             &table_name
         ))
-        .fetch_one(&d.data_db)
+        .fetch_one(&d.db.data)
         .await
         .map(|v| GQLJson(v))
         .map_err(|e| e.into())

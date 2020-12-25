@@ -22,10 +22,6 @@ pub struct Model {
     pub features: Vec<String>,
     pub args: Json,
     pub status: Status,
-    pub transformer_uri: Option<String>,
-    pub estimator_uri: Option<String>,
-    pub evaluation: Option<Json>,
-    pub decisions: Option<Json>,
 }
 
 impl Model {
@@ -48,14 +44,14 @@ impl Model {
         .bind(target.to_owned())
         .bind(features)
         .bind(args)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM models WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
@@ -70,7 +66,7 @@ impl Model {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -98,7 +94,7 @@ impl Model {
         )
         .bind(uuid)
         .bind(user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await?;
         Ok(row.0)
     }
@@ -106,7 +102,7 @@ impl Model {
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM models WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }
@@ -148,21 +144,5 @@ impl Model {
 
     pub async fn status(&self) -> &Status {
         &self.status
-    }
-
-    pub async fn transformer_uri(&self) -> &Option<String> {
-        &self.transformer_uri
-    }
-
-    pub async fn estimator_uri(&self) -> &Option<String> {
-        &self.estimator_uri
-    }
-
-    pub async fn evaluation(&self) -> Option<GQLJson<Json>> {
-        self.evaluation.to_owned().map(|v| GQLJson(v))
-    }
-
-    pub async fn decisions(&self) -> Option<GQLJson<Json>> {
-        self.decisions.to_owned().map(|v| GQLJson(v))
     }
 }

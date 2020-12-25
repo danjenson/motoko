@@ -1,8 +1,9 @@
+import '../../common/form_dialog.dart';
+import '../../common/globals.dart' as globals;
+import 'nav.dart';
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:provider/provider.dart';
-import '../../common/globals.dart' as globals;
-import 'nav.dart';
 import 'project.dart' as p;
 import 'query_results_list.dart';
 
@@ -11,26 +12,24 @@ class Projects extends StatelessWidget {
   final Nav nav;
   final query = '''
     query {
-      me {
-        projects {
-          __typename
-          id
-          createdAt
-          updatedAt
-          name
-        }
+      projects {
+        __typename
+        id
+        createdAt
+        updatedAt
+        name
       }
     }
   ''';
-  final getter = (v) => v["me"]["projects"];
   @override
   Widget build(BuildContext context) {
     final onTap = (dynamic proj) => nav.push(proj["name"].toString(),
-        p.Project(nav: nav, projectID: proj["id"].toString()));
+        p.Project(nav: nav, projectId: proj["id"].toString()));
     return QueryResultsList(
       query: query,
       variables: {},
-      getter: getter,
+      getter: (v) => v["projects"],
+      title: (v) => v['name'],
       onTap: onTap,
     );
   }
@@ -112,7 +111,7 @@ class _NewProjectFormState extends State<NewProjectForm> {
                                 project["name"].toString(),
                                 p.Project(
                                     nav: widget.nav,
-                                    projectID: project["id"].toString()));
+                                    projectId: project["id"].toString()));
                             globals.refetch();
                           }
                         })
@@ -124,16 +123,6 @@ class _NewProjectFormState extends State<NewProjectForm> {
 void add(BuildContext context) {
   final nav = Provider.of<Nav>(context, listen: false);
   final client = GraphQLProvider.of(context).value;
-  showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('New Project',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
-          contentPadding: EdgeInsets.zero,
-          // content: NewProjectForm(nav: nav, client: client),
-          content: NewProjectForm(nav: nav, client: client),
-        );
-      });
+  final form = NewProjectForm(nav: nav, client: client);
+  formDialog(context: context, title: 'New Project', form: form);
 }

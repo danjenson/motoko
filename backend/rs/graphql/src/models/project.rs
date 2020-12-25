@@ -1,5 +1,5 @@
 use crate::{
-    gql::data,
+    gql::{current_user, data},
     models::{
         analysis::Analysis,
         dataset::Dataset,
@@ -29,7 +29,7 @@ impl Project {
         name: &str,
         user_uuid: &Uuid,
     ) -> SQLxResult<Self> {
-        let mut tx = db.begin().await?;
+        let mut tx = db.meta.begin().await?;
         let project: Self =
             query_as("INSERT INTO projects (name) VALUES ($1) RETURNING *")
                 .bind(name)
@@ -53,7 +53,7 @@ impl Project {
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM projects WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
@@ -68,7 +68,7 @@ impl Project {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -82,14 +82,14 @@ impl Project {
             "#,
         )
         .bind(uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM projects WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }
@@ -116,11 +116,24 @@ impl Project {
 
     pub async fn datasets(&self, ctx: &Context<'_>) -> GQLResult<Vec<Dataset>> {
         let d = data(ctx)?;
-        query_as("SELECT * FROM datasets WHERE project_uuid = $1")
-            .bind(self.uuid)
-            .fetch_all(&d.db)
-            .await
-            .map_err(|e| e.into())
+        let user = current_user(ctx)?;
+        query_as(
+            r#"
+            SELECT d.*
+            FROM datasets d
+            JOIN projects p
+            ON p.uuid = d.project_uuid
+            JOIN project_user_roles pur
+            ON p.uuid = pur.project_uuid
+            WHERE pur.user_uuid = $1
+            AND p.uuid = $2
+            "#,
+        )
+        .bind(&user.uuid)
+        .bind(&self.uuid)
+        .fetch_all(&d.db.meta)
+        .await
+        .map_err(|e| e.into())
     }
 
     pub async fn analyses(
@@ -128,11 +141,24 @@ impl Project {
         ctx: &Context<'_>,
     ) -> GQLResult<Vec<Analysis>> {
         let d = data(ctx)?;
-        query_as("SELECT * FROM analyses WHERE project_uuid = $1")
-            .bind(self.uuid)
-            .fetch_all(&d.db)
-            .await
-            .map_err(|e| e.into())
+        let user = current_user(ctx)?;
+        query_as(
+            r#"
+            SELECT a.*
+            FROM analyses a
+            JOIN datasets ds
+            ON a.dataset_uuid = ds.uuid
+            JOIN project_user_roles pur
+            ON ds.project_uuid = pur.project_uuid
+            WHERE pur.user_uuid = $1
+            AND ds.project_uuid = $2
+            "#,
+        )
+        .bind(&user.uuid)
+        .bind(&self.uuid)
+        .fetch_all(&d.db.meta)
+        .await
+        .map_err(|e| e.into())
     }
 
     pub async fn roles(
@@ -140,10 +166,21 @@ impl Project {
         ctx: &Context<'_>,
     ) -> GQLResult<Vec<ProjectUserRole>> {
         let d = data(ctx)?;
-        query_as("SELECT * FROM project_user_roles WHERE project_uuid = $1")
-            .bind(self.uuid)
-            .fetch_all(&d.db)
-            .await
-            .map_err(|e| e.into())
+        let user = current_user(ctx)?;
+        query_as(
+            r#"
+            SELECT pur.*
+            FROM project_user_roles pur
+            JOIN projects p
+            ON p.uuid = pur.project_uuid
+            WHERE pur.user_uuid = $1
+            AND p.uuid = $2
+            "#,
+        )
+        .bind(&user.uuid)
+        .bind(&self.uuid)
+        .fetch_all(&d.db.meta)
+        .await
+        .map_err(|e| e.into())
     }
 }

@@ -3,8 +3,8 @@ import 'preview_panel.dart';
 import 'scrollable_table.dart';
 
 class Data extends StatelessWidget {
-  Data({@required this.analysisID});
-  final String analysisID;
+  Data({@required this.analysisId});
+  final String analysisId;
   final List<String> items = [
     "filter x > 5",
     "summarize y with sum as z group by x",
@@ -31,8 +31,8 @@ class Data extends StatelessWidget {
         main: ListView(
             padding: EdgeInsets.all(20),
             children: items
-                .map((opID) =>
-                    Card(elevation: 3.0, child: ListTile(title: Text(opID))))
+                .map((opId) =>
+                    Card(elevation: 3.0, child: ListTile(title: Text(opId))))
                 .toList()),
         preview: ScrollableTable(schema: schema, rows: rows));
   }

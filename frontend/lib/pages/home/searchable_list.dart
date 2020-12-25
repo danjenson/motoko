@@ -13,6 +13,7 @@ class SearchableList extends StatefulWidget {
 }
 
 class _SearchableListState extends State<SearchableList> {
+  var _controller = TextEditingController();
   List<Widget> filtered = [];
   bool hasFiltered = false;
   @override
@@ -20,6 +21,7 @@ class _SearchableListState extends State<SearchableList> {
     return Column(children: <Widget>[
       Container(
           child: TextField(
+              controller: _controller,
               onChanged: (search) {
                 setState(() {
                   filtered = widget.items
@@ -30,15 +32,28 @@ class _SearchableListState extends State<SearchableList> {
                   hasFiltered = true;
                 });
               },
-              style: TextStyle(fontSize: 25),
+              style: TextStyle(fontSize: 25, color: Colors.white),
               decoration: InputDecoration(
-                  hintText: "Search", prefixIcon: Icon(Icons.search))),
-          padding: EdgeInsets.fromLTRB(25, 10, 25, 10)),
+                prefixIcon: Icon(Icons.search, size: 30),
+                suffixIcon: Visibility(
+                    visible: hasFiltered,
+                    child: IconButton(
+                      onPressed: () {
+                        _controller.clear();
+                        setState(() {
+                          hasFiltered = false;
+                        });
+                      },
+                      icon: Icon(Icons.clear, size: 30),
+                    )),
+                hintText: "Search",
+              )),
+          padding: EdgeInsets.fromLTRB(15, 10, 15, 10)),
       widget.loading
           ? Expanded(child: Center(child: CircularProgressIndicator()))
           : Expanded(
               child: ListView(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  padding: EdgeInsets.fromLTRB(10, 0, 10, 225),
                   children: hasFiltered ? filtered : widget.items)),
     ]);
   }

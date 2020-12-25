@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
-import '../../common/error_dialog.dart';
 
 class DataPreview extends StatelessWidget {
   DataPreview({@required this.id});
@@ -40,9 +39,7 @@ class DataPreview extends StatelessWidget {
             {VoidCallback refetch, FetchMore fetchMore}) {
           var loading =
               result.loading && result.source == QueryResultSource.Loading;
-          if (result.hasException) {
-            return ErrorDialog(result.exception.toString());
-          } else if (!loading) {
+          if (!loading) {
             schema = result.data["node"]["schema"];
             sampleRows = result.data["node"]["sampleRows"];
           }

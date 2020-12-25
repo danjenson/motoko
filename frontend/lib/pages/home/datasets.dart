@@ -1,17 +1,18 @@
+import '../../common/error_dialog.dart';
+import '../../common/form_dialog.dart';
+import '../../common/globals.dart' as globals;
+import '../../common/types.dart';
+import 'data_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
-import '../../common/error_dialog.dart';
-import '../../common/globals.dart' as globals;
-import '../../common/types.dart';
 import 'preview_panel.dart';
-import 'data_preview.dart';
 import 'query_results_list.dart';
 
 class Datasets extends StatefulWidget {
-  Datasets({@required this.projectID});
-  final String projectID;
-  final datasetsQuery = '''
+  Datasets({@required this.projectId});
+  final String projectId;
+  final datasets = '''
     query Datasets(\$projectId: ID!) {
       datasets(projectId: \$projectId) {
         __typename
@@ -28,33 +29,38 @@ class Datasets extends StatefulWidget {
 }
 
 class _DatasetsState extends State<Datasets> {
-  String _selectedDatasetID;
+  String _selectedId;
   PanelController _controller = PanelController();
   @override
   Widget build(BuildContext context) {
     return PreviewPanel(
         controller: _controller,
         main: QueryResultsList(
-          query: widget.datasetsQuery,
-          variables: {"projectId": widget.projectID},
+          query: widget.datasets,
+          variables: {"projectId": widget.projectId},
           getter: (v) => v["datasets"],
-          onTap: (ds) {
-            this.setState(() {
+          title: (v) => v["name"],
+          onTap: (v) {
+            setState(() {
+              _selectedId = v["id"].toString();
               _controller.animatePanelToPosition(1.0);
-              _selectedDatasetID = ds["id"].toString();
             });
           },
+          selectedId: _selectedId,
         ),
-        preview: _selectedDatasetID == null
-            ? Center(child: Text("Select a dataset!"))
-            : DataPreview(id: _selectedDatasetID));
+        preview: _selectedId == null
+            ? Expanded(
+                child: Center(
+                    child: Text("Tap a dataset for sample rows.",
+                        style: TextStyle(fontSize: 20.0))))
+            : DataPreview(id: _selectedId));
   }
 }
 
 class NewDatasetForm extends StatefulWidget {
-  NewDatasetForm({@required this.client, @required this.projectID});
+  NewDatasetForm({@required this.client, @required this.projectId});
   final GraphQLClient client;
-  final String projectID;
+  final String projectId;
   final createDataset = '''
     mutation CreateDataset(\$projectId: ID!, \$name: String!, \$uri: String!) {
       createDataset(projectId: \$projectId, name: \$name, uri: \$uri) {
@@ -138,7 +144,7 @@ class _NewDatasetFormState extends State<NewDatasetForm> {
                                 fetchPolicy: FetchPolicy.networkOnly,
                                 documentNode: gql(widget.createDataset),
                                 variables: {
-                                  "projectId": widget.projectID,
+                                  "projectId": widget.projectId,
                                   "name": _name,
                                   "uri": _uri
                                 });
@@ -156,21 +162,11 @@ class _NewDatasetFormState extends State<NewDatasetForm> {
   }
 }
 
-Adder makeAdder(String projectID) {
+Adder makeAdder(String projectId) {
   void add(BuildContext context) {
     final client = GraphQLProvider.of(context).value;
-    showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text("New Dataset",
-                textAlign: TextAlign.center,
-                style:
-                    TextStyle(color: Theme.of(context).colorScheme.secondary)),
-            contentPadding: EdgeInsets.zero,
-            content: NewDatasetForm(client: client, projectID: projectID),
-          );
-        });
+    final form = NewDatasetForm(client: client, projectId: projectId);
+    formDialog(context: context, title: 'New Dataset', form: form);
   }
 
   return add;

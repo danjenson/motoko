@@ -36,28 +36,28 @@ impl User {
         .bind(display_name)
         .bind(name)
         .bind(email)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM users WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
     pub async fn get_by_email(db: &Db, email: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM users WHERE email = $1")
             .bind(email)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
     pub async fn get_by_name(db: &Db, name: &str) -> SQLxResult<Self> {
         query_as("SELECT * FROM users WHERE name = $1")
             .bind(name)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
@@ -72,14 +72,14 @@ impl User {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM users WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }
@@ -116,6 +116,19 @@ impl User {
         &self.email
     }
 
+    pub async fn refresh_tokens(
+        &self,
+        ctx: &Context<'_>,
+    ) -> GQLResult<Vec<UserRefreshToken>> {
+        is_current_user(&self.uuid, ctx)?;
+        let d = data(ctx)?;
+        query_as("SELECT * FROM user_refresh_tokens WHERE user_uuid = $1")
+            .bind(self.uuid)
+            .fetch_all(&d.db.meta)
+            .await
+            .map_err(|e| e.into())
+    }
+
     pub async fn projects(&self, ctx: &Context<'_>) -> GQLResult<Vec<Project>> {
         is_current_user(&self.uuid, ctx)?;
         let d = data(ctx)?;
@@ -129,21 +142,8 @@ impl User {
             "#,
         )
         .bind(self.uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
-    }
-
-    pub async fn refresh_tokens(
-        &self,
-        ctx: &Context<'_>,
-    ) -> GQLResult<Vec<UserRefreshToken>> {
-        is_current_user(&self.uuid, ctx)?;
-        let d = data(ctx)?;
-        query_as("SELECT * FROM user_refresh_tokens WHERE user_uuid = $1")
-            .bind(self.uuid)
-            .fetch_all(&d.db)
-            .await
-            .map_err(|e| e.into())
     }
 }

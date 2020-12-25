@@ -4,13 +4,21 @@ Description: motoko-backend
 
 Globals:
   Function:
-    Timeout: 5
+    Timeout: 300
+    Environment:
+      Variables:
+        RUN_MODE: prod
 
 Resources:
   MotokoGraphQL:
     Type: AWS::Serverless::Function
+    Role: arn:aws:iam::902096072945:role/motoko-lambda
     Properties:
       FunctionName: motoko-graphql
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      Environment:
+        Variables:
+          RUST_BACKTRACE: 1
       CodeUri: rs/graphql
       Handler: bootstrap.is.real.handler
       Runtime: provided
@@ -20,6 +28,10 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: motoko-garbage-collect
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      Environment:
+        Variables:
+          RUST_BACKTRACE: 1
       CodeUri: rs/graphql
       Handler: bootstrap.is.real.handler
       Runtime: provided
@@ -29,13 +41,24 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: motoko-uri-to-sql-db
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
       CodeUri: py/uri-to-sql-db
-      Handler: main.lambda_handler
+      Handler: app.lambda_handler
       Runtime: python3.8
-  NetworkIntrospection:
+  MotokoPlot:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: network-introspection
-      CodeUri: py/network-introspection
-      Handler: main.lambda_handler
+      FunctionName: motoko-plot
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      MemorySize: 1024
+      CodeUri: py/plot
+      Handler: app.lambda_handler
+      Runtime: python3.8
+  MotokoInvalidateCache:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-invalidate-cache
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      CodeUri: py/invalidate-cache
+      Handler: app.lambda_handler
       Runtime: python3.8

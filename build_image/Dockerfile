@@ -1,5 +1,5 @@
 FROM cirrusci/flutter:latest
-RUN apt update && apt install pkg-config libssl-dev \
+RUN apt update && apt install pkg-config libssl-dev musl -y \
   && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && chmod +x $HOME/.cargo/env \
   && $HOME/.cargo/env \
@@ -7,4 +7,4 @@ RUN apt update && apt install pkg-config libssl-dev \
   && unzip awscliv2.zip \
   && sudo ./aws/install
 ENV PATH="$PATH:$HOME:/root/.cargo/bin"
-RUN rustup install nightly && rustup default nightly
+RUN rustup default stable

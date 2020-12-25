@@ -2,8 +2,8 @@ use clap::{load_yaml, App, ArgMatches};
 use regex::Regex;
 use std::{
     env,
-    fs::{create_dir_all, read_dir, remove_file, File},
-    io::{BufRead, BufReader, Write},
+    fs::{self, create_dir_all, read_dir, remove_file, File},
+    io::{self, Write},
     os::unix::fs::symlink,
     path::Path,
     process::{exit, Command, ExitStatus, Stdio},
@@ -117,6 +117,7 @@ fn set_dir_to_git_root() {
 fn build(args: &ArgMatches) {
     match args.subcommand() {
         Some(("android", args)) => build_android(args),
+        Some(("backend", _)) => build_backend(),
         Some(("build-image", _)) => build_build_image(),
         Some(("graphql", _)) => {
             build_rust_lambda("backend/rs/graphql", "graphql")
@@ -157,6 +158,10 @@ fn build_android(args: &ArgMatches) {
     }
 }
 
+fn build_backend() {
+    run_from("backend", "sam", &["build"]);
+}
+
 fn ensure_clean(path: &str) {
     // intermediate build files are not ignored by git in cloudbuild
     if !run_from(".", "git", &["status", "--porcelain", path]).is_empty()
@@ -170,7 +175,7 @@ fn build_android_apks() {
     ensure_on_branch(&["dev", "prod"]);
     ensure_clean("frontend");
     if is_cloudbuild() {
-        setup_android_keystore();
+        setup_android_keystores();
     }
     run_from("frontend", "flutter", &["clean"]);
     run_from(
@@ -194,7 +199,7 @@ fn build_android_bundle() {
     ensure_on_branch(&["dev", "prod"]);
     ensure_clean("frontend");
     if is_cloudbuild() {
-        setup_android_keystore();
+        setup_android_keystores();
     }
     run_from("frontend", "flutter", &["clean"]);
     run_from("frontend", "flutter", &["build", "appbundle", "--release"]);
@@ -250,12 +255,6 @@ fn build_rust_lambda(path: &str, bin_name: &str) {
 fn deploy_rust_lambda(path: &str, bin_name: &str) {
     // TODO(danj): should this be restricted?
     // ensure_on_branch(&["dev", "prod"]);
-    let branch = if current_branch() == "prod" {
-        "prod"
-    } else {
-        "dev"
-    };
-    let function_name = &format!("{}-{}-{}", current_repo(), bin_name, branch);
     let build_dir = "target/x86_64-unknown-linux-musl/release";
     let binary_path = &format!("{}/{}", build_dir, bin_name);
     let binary_bootstrap_path = &format!("{}/{}", build_dir, "bootstrap");
@@ -269,7 +268,8 @@ fn deploy_rust_lambda(path: &str, bin_name: &str) {
         "zip",
         &["-j", binary_bootstrap_path_zip, binary_bootstrap_path],
     );
-    if lambda_exists(function_name) {
+    let function_name = lambda_function_name(bin_name);
+    if lambda_exists(&function_name) {
         run_from(
             path,
             "aws",
@@ -277,7 +277,7 @@ fn deploy_rust_lambda(path: &str, bin_name: &str) {
                 "lambda",
                 "update-function-code",
                 "--function-name",
-                function_name,
+                &function_name,
                 "--zip-file",
                 fileb_binary_bootstrap_path_zip,
             ],
@@ -290,7 +290,7 @@ fn deploy_rust_lambda(path: &str, bin_name: &str) {
                 "lambda",
                 "create-function",
                 "--function-name",
-                function_name,
+                &function_name,
                 "--handler",
                 "doesnt.matter",
                 "--zip-file",
@@ -343,20 +343,24 @@ fn deploy(args: &ArgMatches) {
     match args.subcommand() {
         Some(("all", _)) => deploy_all(),
         Some(("android", args)) => deploy_android(args),
+        Some(("backend", _)) => deploy_backend(),
         Some(("build-image", _)) => deploy_build_image(),
-        Some(("garbage-collect", _)) => {
-            deploy_rust_lambda("backend/rs/graphql", "garbage-collect")
-        }
+        Some(("garbage-collect", _)) => build_and_deploy_rust_lambda(
+            "backend/rs/graphql",
+            "garbage-collect",
+        ),
         Some(("graphql", _)) => {
-            deploy_rust_lambda("backend/rs/graphql", "graphql")
+            build_and_deploy_rust_lambda("backend/rs/graphql", "graphql")
         }
         Some(("ios", _)) => deploy_ios(),
-        Some(("infer-datatypes", _)) => deploy_python_lambda("infer-datatypes"),
-        Some(("invalidate-cache", _)) => {
-            deploy_python_lambda("invalidate-cache")
+        Some(("invalidate-cache", args)) => {
+            deploy_python_lambda("invalidate-cache", args)
         }
-        Some(("uri-to-sql-db", _)) => deploy_python_lambda("uri-to-sql-db"),
-        Some(("last-commit", _)) => deploy_last_commit(),
+        Some(("plot", args)) => deploy_python_lambda("plot", args),
+        Some(("uri-to-sql-db", args)) => {
+            deploy_python_lambda("uri-to-sql-db", args)
+        }
+        Some(("last-commit", args)) => deploy_last_commit(args),
         Some(("web", _)) => deploy_web(),
         _ => quit("invalid deploy target!"),
     }
@@ -364,15 +368,16 @@ fn deploy(args: &ArgMatches) {
 
 fn deploy_all() {
     ensure_on_branch(&["dev", "prod"]);
-    build_and_deploy_rust_lambda("backend/rs/graphql", "graphql");
-    build_and_deploy_rust_lambda("backend/rs/graphql", "garbage-collect");
-    deploy_python_lambda("invalidate-cache");
-    deploy_python_lambda("infer-datatypes");
-    deploy_python_lambda("uri-to-sql-db");
+    deploy_backend();
     build_android_apks();
     deploy_android_apks();
     build_web();
     deploy_web();
+}
+
+fn deploy_backend() {
+    build_backend();
+    run_from("backend", "sam", &["deploy"]);
 }
 
 fn deploy_android(args: &ArgMatches) {
@@ -386,9 +391,6 @@ fn deploy_android(args: &ArgMatches) {
 
 fn deploy_android_apks() {
     ensure_on_branch(&["dev", "prod"]);
-    let s3_bucket =
-        format!("s3://{}-{}-mobile", current_repo(), current_branch());
-    run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
     run_from(
         "frontend",
         "aws",
@@ -396,32 +398,13 @@ fn deploy_android_apks() {
             "s3",
             "cp",
             "build/app/outputs/apk/release/app-arm64-v8a-release.apk",
-            &format!("{}/install/android", s3_bucket),
+            &format!(
+                "s3://motoko-frontend/{}/install/android",
+                current_branch()
+            ),
         ],
     );
     invalidate_cache();
-}
-
-fn infer_datatypes(args: &ArgMatches) {
-    let output_file = "/tmp/infer-datatypes.json";
-    run_from(
-        ".",
-        "aws",
-        &[
-            "lambda",
-            "invoke",
-            "--cli-binary-format",
-            "raw-in-base64-out",
-            "--function-name",
-            "motoko-infer-datatypes",
-            "--payload",
-            &format!("{{ \"uri\": \"{}\" }}", args.value_of("uri").unwrap()),
-            output_file,
-        ],
-    );
-    let output = std::fs::read_to_string(output_file).unwrap();
-    let value: serde_json::Value = serde_json::from_str(&output).unwrap();
-    println!("{:?}", value);
 }
 
 fn invalidate_cache() {
@@ -493,24 +476,45 @@ fn deploy_build_image() {
     );
 }
 
-fn deploy_python_lambda(name: &str) {
-    let dir = format!("backend/py/{}", name);
+fn deploy_python_lambda(name: &str, args: &ArgMatches) {
     // TODO(danj): should this only be on dev and prod branches?
     // ensure_on_branch(&["dev", "prod"]);
     // ensure_clean(&dir);
+    let skip_deps = args.is_present("skip-deps");
+    let dir = format!("backend/py/{}", name);
     let zip_path = format!("/tmp/{}.zip", name);
     let fileb_zip_path = &format!("fileb://{}", zip_path);
+    let compile_reqs = format!("{}/compile-requirements.txt", dir);
     let reqs = format!("{}/requirements.txt", dir);
-    if Path::new(&reqs).exists() {
-        let deps = format!("{}/deps", &dir);
-        run_from(".", "rm", &["-rf", &deps]);
-        run_from(".", "pip", &["install", "-r", &reqs, "--target", &deps]);
-        run_from(&deps, "zip", &["-r9", &zip_path, "."]);
-        run_from(&dir, "zip", &["-g", &zip_path, "main.py"]);
-    } else {
-        run_from(&dir, "zip", &["-r9", &zip_path, "main.py"]);
+    let deps = format!("{}/deps", &dir);
+    if Path::new(&compile_reqs).exists() & !skip_deps {
+        run_from(
+            ".",
+            "pip",
+            &[
+                "install",
+                "--no-cache-dir",
+                "--compile",
+                "--global-option",
+                "build_ext",
+                "--global-option",
+                "-Os -g0 --strip-all",
+                "--global-option",
+                "-j 4",
+                "-r",
+                &compile_reqs,
+                "--target",
+                &deps,
+            ],
+        );
     }
-    let function_name = format!("motoko-{}", name);
+    if Path::new(&reqs).exists() & !skip_deps {
+        run_from(".", "pip", &["install", "-r", &reqs, "--target", &deps]);
+    }
+    remove_file_if_exists(&zip_path);
+    run_from(&deps, "zip", &["-r9", &zip_path, "."]);
+    run_from(&dir, "zip", &["-g", &zip_path, "app.py"]);
+    let function_name = lambda_function_name(name);
     if lambda_exists(&function_name) {
         run_from(
             ".",
@@ -552,35 +556,40 @@ fn deploy_python_lambda(name: &str) {
     }
 }
 
+fn lambda_function_name(bin_name: &str) -> String {
+    format!("{}-{}", current_repo(), bin_name)
+}
+
 fn deploy_ios() {
     ensure_on_branch(&["dev", "prod"]);
     quit("deploying iOS frontend is not yet supported!");
 }
 
-fn deploy_last_commit() {
+fn deploy_last_commit(args: &ArgMatches) {
     ensure_on_branch(&["dev", "prod"]);
     let modified_files =
         &run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
+    let msg = "unable to read python backend directory";
+    let pys = fs::read_dir("/data/repos/motoko/backend/py")
+        .expect(msg)
+        .map(|res| res.map(|e| e.file_name()))
+        .collect::<Result<Vec<_>, io::Error>>()
+        .expect(msg);
+    pys.iter().for_each(|f| {
+        let func = f.to_str().unwrap();
+        if Regex::new(&format!("(^|[[:^alpha:]])backend/py/{}", func))
+            .unwrap()
+            .is_match(modified_files)
+        {
+            deploy_python_lambda(func, args);
+        }
+    });
     let frontend = Regex::new("(^|[[:^alpha:]])frontend").unwrap();
     let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/graphql").unwrap();
-    let garbage_collect =
-        Regex::new("(^|[[:^alpha:]])backend/rs/garbage-collect").unwrap();
-    let invalidate_cache =
-        Regex::new("(^|[[:^alpha:]])backend/py/invalidate-cache").unwrap();
-    let infer_datatypes =
-        Regex::new("(^|[[:^alpha:]])backend/py/infer-datatypes").unwrap();
     // execute in topological order
     if graphql.is_match(modified_files) {
         build_and_deploy_rust_lambda("backend/rs/graphql", "graphql");
-    }
-    if garbage_collect.is_match(modified_files) {
         build_and_deploy_rust_lambda("backend/rs/graphql", "garbage-collect");
-    }
-    if invalidate_cache.is_match(modified_files) {
-        deploy_python_lambda("invalidate-cache");
-    }
-    if infer_datatypes.is_match(modified_files) {
-        deploy_python_lambda("infer-datatypes");
     }
     if frontend.is_match(modified_files) {
         build_android_apks();
@@ -592,12 +601,16 @@ fn deploy_last_commit() {
 
 fn deploy_web() {
     ensure_on_branch(&["dev", "prod"]);
-    let s3_bucket = format!("s3://{}-{}-www", current_repo(), current_branch());
-    run_from("frontend", "aws", &["s3", "rm", &s3_bucket, "--recursive"]);
     run_from(
         "frontend",
         "aws",
-        &["s3", "cp", "build/web", &s3_bucket, "--recursive"],
+        &[
+            "s3",
+            "cp",
+            "build/web",
+            &format!("s3://motoko-frontend/{}", current_branch()),
+            "--recursive",
+        ],
     );
     invalidate_cache();
 }
@@ -678,49 +691,14 @@ fn install_ios() {
 
 fn run(args: &ArgMatches) {
     match args.subcommand() {
-        Some(("connect-to-aws-db", _)) => connect_to_aws_db(),
         Some(("frontend", args)) => run_frontend(args),
         Some(("graphql", args)) => graphql(args),
-        Some(("infer-datatypes", args)) => infer_datatypes(args),
         Some(("invalidate-cache", _)) => invalidate_cache(),
-        Some(("reset-android-keystore", _)) => {
-            reset_android_keystore();
-            setup_android_keystore();
-        }
-        Some(("reset-databases", _)) => reset_databases(),
-        Some(("upload-debug-android-keystore", _)) => {
-            upload_debug_android_keystore();
-        }
-        Some(("upload-backend-dotenv", _)) => {
-            upload_backend_dotenv();
-        }
-        Some(("setup-android-keystore", _)) => setup_android_keystore(),
-        Some(("setup-backend-dotenv", _)) => setup_backend_dotenv(),
+        Some(("reset-android-keystores", _)) => reset_android_keystores(),
+        Some(("reset-databases", args)) => reset_databases(args),
+        Some(("setup-android-keystores", _)) => setup_android_keystores(),
         _ => quit("invalid run target!"),
     }
-}
-
-fn connect_to_aws_db() {
-    // TODO(danj): continuously pipe io
-    dotenv::from_filename("backend/rs/graphql/.env").ok();
-    let stdout = Command::new("psql")
-        .args(&[
-            "--host=motoko-free-tier.cpybpfl4z4kw.us-west-1.rds.amazonaws.com",
-            "--port=5432",
-            "--username=motoko",
-            "--dbname=postgres",
-        ])
-        .stdout(Stdio::piped())
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("unable to connect to db")
-        .stdout
-        .expect("unable to collect stdout");
-    BufReader::new(stdout)
-        .lines()
-        .filter_map(|line| line.ok())
-        .for_each(|line| println!("{}", line));
 }
 
 fn run_frontend(args: &ArgMatches) {
@@ -799,14 +777,32 @@ fn _gql(endpoint: &str, args: &ArgMatches) {
     }
 }
 
-fn reset_android_keystore() {
-    let path = "/tmp/signing_key.jks";
+fn reset_android_keystores() {
+    let pw = get_password();
+    reset_android_keystore(
+        "android",
+        &format!("{}/.android/debug.keystore", &home_dir()),
+        "android_debug_keystore",
+        "androiddebugkey",
+    );
+    reset_android_keystore(
+        &pw,
+        &format!("{}/.keys/motoko/android/signing_key.jks", &home_dir()),
+        "android_release_keystore",
+        "signing_key",
+    );
+    setup_android_keystores();
+}
+
+fn reset_android_keystore(pw: &str, path: &str, key: &str, alias: &str) {
     remove_file_if_exists(path);
-    let pw = rpassword::read_password_from_tty(Some("Password: ")).unwrap();
-    generate_android_keystore(&pw, path);
-    put_binary_secret(path, "android_keystore");
-    put_android_keystore_password(&pw);
-    remove_file_if_exists(path);
+    generate_android_keystore(pw, path, alias);
+    put_binary_secret(path, key);
+    put_android_keystore_password(&(key.to_string() + "_password"), &pw);
+}
+
+fn get_password() -> String {
+    rpassword::read_password_from_tty(Some("Password: ")).unwrap()
 }
 
 fn remove_file_if_exists(path: &str) {
@@ -818,17 +814,7 @@ fn remove_file_if_exists(path: &str) {
     }
 }
 
-fn upload_debug_android_keystore() {
-    let home_dir = dirs::home_dir()
-        .expect("unable to get user's home directory!")
-        .into_os_string()
-        .into_string()
-        .expect("unable to convert home directory into string for path!");
-    let path = &format!("{}/.android/debug.keystore", home_dir);
-    put_binary_secret(path, "debug_android_keystore");
-}
-
-fn generate_android_keystore(password: &str, path: &str) {
+fn generate_android_keystore(password: &str, path: &str, alias: &str) {
     run_from(
         ".",
         "keytool",
@@ -845,7 +831,7 @@ fn generate_android_keystore(password: &str, path: &str) {
             "-validity",
             "10000",
             "-alias",
-            "signing_key",
+            alias,
             "-keypass",
             password,
             "-storepass",
@@ -908,47 +894,30 @@ fn secret_exists(name: &str) -> bool {
     .success()
 }
 
-fn put_android_keystore_password(pw: &str) {
-    put_secret("android_keystore_password", SecretType::String, pw);
+fn put_android_keystore_password(key: &str, pw: &str) {
+    put_secret(key, SecretType::String, pw);
 }
 
-fn upload_backend_dotenv() {
-    put_binary_secret("backend/.env", "backend_dotenv");
-}
-
-fn setup_backend_dotenv() {
-    let dotenv = get_secret("backend_dotenv", SecretType::Binary);
-    let dotenv_path_str = "backend/.env";
-    let dotenv_path = Path::new(dotenv_path_str);
-    let mut dotenv_file = File::create(dotenv_path)
-        .unwrap_or_else(|_| panic!("unable to open {}", dotenv_path_str));
-    dotenv_file.write_all(&dotenv).unwrap_or_else(|_| {
-        panic!("unable to write dotenv to {}", dotenv_path_str)
-    });
-    remove_file_if_exists("backend/rs/graphql/.env");
-    symlink("../../.env", "backend/rs/graphql/.env").unwrap();
-}
-
-fn setup_android_keystore() {
-    let home_dir = dirs::home_dir()
-        .expect("unable to get user's home directory!")
-        .into_os_string()
-        .into_string()
-        .expect("unable to convert home directory into string for path!");
-    let keystore_path_str =
-        &format!("{}/.keys/motoko/android/signing_key.jks", home_dir);
+fn setup_android_keystores() {
+    let release_keystore_path_str =
+        &format!("{}/.keys/motoko/android/signing_key.jks", &home_dir());
     let debug_keystore_path_str =
-        &format!("{}/.android/debug.keystore", home_dir);
-    let keystore_path = Path::new(keystore_path_str);
+        &format!("{}/.android/debug.keystore", &home_dir());
+    let release_keystore_path = Path::new(release_keystore_path_str);
     let debug_keystore_path = Path::new(debug_keystore_path_str);
-    let keystore_dir = keystore_path.parent().unwrap();
+    let release_keystore_dir = release_keystore_path.parent().unwrap();
     let debug_keystore_dir = debug_keystore_path.parent().unwrap();
-    let keystore_dir_str = keystore_dir.to_string_lossy();
+    let release_keystore_dir_str = release_keystore_dir.to_string_lossy();
     let debug_keystore_dir_str = debug_keystore_dir.to_string_lossy();
-    let key_properties_path = Path::new("frontend/android/key.properties");
-    let key_properties_path_str = key_properties_path.to_string_lossy();
-    create_dir_all(keystore_dir).unwrap_or_else(|_| {
-        panic!("unable to create key directory: {}", keystore_dir_str)
+    let release_key_properties_path =
+        Path::new("frontend/android/key.properties");
+    let release_key_properties_path_str =
+        release_key_properties_path.to_string_lossy();
+    create_dir_all(release_keystore_dir).unwrap_or_else(|_| {
+        panic!(
+            "unable to create key directory: {}",
+            release_keystore_dir_str
+        )
     });
     create_dir_all(debug_keystore_dir).unwrap_or_else(|_| {
         panic!(
@@ -956,16 +925,18 @@ fn setup_android_keystore() {
             debug_keystore_dir_str
         )
     });
-    let ks = get_secret("android_keystore", SecretType::Binary);
-    let dks = get_secret("debug_android_keystore", SecretType::Binary);
-    let mut keystore = File::create(keystore_path)
-        .unwrap_or_else(|_| panic!("unable to open {}", keystore_path_str));
+    let ks = get_secret("android_release_keystore", SecretType::Binary);
+    let dks = get_secret("android_debug_keystore", SecretType::Binary);
+    let mut release_keystore = File::create(release_keystore_path)
+        .unwrap_or_else(|_| {
+            panic!("unable to open {}", release_keystore_path_str)
+        });
     let mut debug_keystore =
         File::create(debug_keystore_path).unwrap_or_else(|_| {
             panic!("unable to open {}", debug_keystore_path_str)
         });
-    keystore.write_all(&ks).unwrap_or_else(|_| {
-        panic!("unable to write keystore to {}", keystore_path_str)
+    release_keystore.write_all(&ks).unwrap_or_else(|_| {
+        panic!("unable to write keystore to {}", release_keystore_path_str)
     });
     debug_keystore.write_all(&dks).unwrap_or_else(|_| {
         panic!(
@@ -973,26 +944,35 @@ fn setup_android_keystore() {
             debug_keystore_path_str
         )
     });
-    let pw = get_secret("android_keystore_password", SecretType::String);
-    let mut key_properties =
-        File::create(key_properties_path).unwrap_or_else(|_| {
-            panic!("unable to open: {}", key_properties_path_str)
+    let pw =
+        get_secret("android_release_keystore_password", SecretType::String);
+    let mut release_key_properties = File::create(release_key_properties_path)
+        .unwrap_or_else(|_| {
+            panic!("unable to open: {}", release_key_properties_path_str)
         });
-    let key_properties_content = [
+    let release_key_properties_content = [
         &format!("storePassword={}", std::str::from_utf8(&pw).unwrap()),
         &format!("keyPassword={}", std::str::from_utf8(&pw).unwrap()),
         "keyAlias=signing_key",
-        &format!("storeFile={}", keystore_path_str),
+        &format!("storeFile={}", release_keystore_path_str),
     ]
     .join("\n");
-    key_properties
-        .write_all(&key_properties_content.as_bytes())
+    release_key_properties
+        .write_all(&release_key_properties_content.as_bytes())
         .unwrap_or_else(|_| {
             panic!(
                 "unable to write key properties file to {}",
-                key_properties_path_str
+                release_key_properties_path_str
             )
         });
+}
+
+fn home_dir() -> String {
+    dirs::home_dir()
+        .expect("unable to get user's home directory!")
+        .into_os_string()
+        .into_string()
+        .expect("unable to convert home directory into string for path!")
 }
 
 fn get_secret(name: &str, secret_type: SecretType) -> Vec<u8> {
@@ -1013,13 +993,49 @@ fn get_secret(name: &str, secret_type: SecretType) -> Vec<u8> {
     value
 }
 
-fn reset_databases() {
-    dotenv::from_filename("backend/rs/graphql/.env").ok();
-    run_from("backend/rs/graphql", "sqlx", &["database", "reset"]);
-    env::set_var("DATABASE_URL", env::var("DATA_DATABASE_URL").unwrap());
-    run_from(
-        "backend/rs/graphql",
-        "sqlx",
-        &["database", "reset", "--source", "data_migrations"],
-    );
+fn reset_databases(args: &ArgMatches) {
+    match args.subcommand() {
+        Some(("local", _)) => {
+            env::set_var(
+                "DATABASE_URL",
+                "postgres://postgres@localhost/motoko_data",
+            );
+            run_from(
+                "backend/rs/graphql",
+                "sqlx",
+                &["database", "reset", "--source", "data_migrations"],
+            );
+            env::set_var(
+                "DATABASE_URL",
+                "postgres://postgres@localhost/motoko_meta",
+            );
+            run_from(
+                "backend/rs/graphql",
+                "sqlx",
+                &["database", "reset", "--source", "meta_migrations"],
+            );
+        }
+        Some(("remote", _)) => {
+            let pw = get_password();
+            env::set_var(
+                "DATABASE_URL",
+                &format!("postgres://motoko:{}@motoko-free-tier.cpybpfl4z4kw.us-west-1.rds.amazonaws.com/motoko_data", pw)
+            );
+            run_from(
+                "backend/rs/graphql",
+                "sqlx",
+                &["database", "reset", "--source", "data_migrations"],
+            );
+            env::set_var(
+                "DATABASE_URL",
+                &format!("postgres://motoko:{}@motoko-free-tier.cpybpfl4z4kw.us-west-1.rds.amazonaws.com/motoko_meta", pw)
+            );
+            run_from(
+                "backend/rs/graphql",
+                "sqlx",
+                &["database", "reset", "--source", "meta_migrations"],
+            );
+        }
+        _ => quit("must specify local or remote"),
+    }
 }

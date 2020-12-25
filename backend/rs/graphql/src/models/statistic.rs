@@ -52,7 +52,7 @@ impl Statistic {
         .bind(dataview_uuid)
         .bind(name)
         .bind(args)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -73,7 +73,7 @@ impl Statistic {
             "#,
         )
         .bind(uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -101,7 +101,7 @@ impl Statistic {
         )
         .bind(uuid)
         .bind(user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await?;
         Ok(row.0)
     }
@@ -109,7 +109,7 @@ impl Statistic {
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
         query("DELETE FROM statistics WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }

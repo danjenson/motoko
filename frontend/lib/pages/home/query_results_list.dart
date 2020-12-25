@@ -5,14 +5,21 @@ import '../../common/globals.dart' as globals;
 import '../../common/types.dart';
 import 'searchable_list.dart';
 
-typedef void OnTap(dynamic v);
+typedef bool Predicate(dynamic v);
+typedef void Action(dynamic v);
+typedef Widget WidgetFunc(dynamic v);
 
 class QueryResultsList extends StatelessWidget {
   QueryResultsList({
     @required this.query,
     @required this.variables,
     @required this.getter,
+    @required this.title,
     @required this.onTap,
+    this.subtitle,
+    this.below,
+    this.selectedId,
+    this.canDelete,
   });
   final String query;
   final Map<String, dynamic> variables;
@@ -22,8 +29,12 @@ class QueryResultsList extends StatelessWidget {
     }
   ''';
   final Getter getter;
-  final OnTap onTap;
-  var plannedRefetch = false;
+  final Getter title;
+  final Action onTap;
+  final WidgetFunc subtitle;
+  final WidgetFunc below;
+  final String selectedId;
+  final Predicate canDelete;
   @override
   Widget build(BuildContext context) {
     return Query(
@@ -36,74 +47,70 @@ class QueryResultsList extends StatelessWidget {
             {VoidCallback refetch, FetchMore fetchMore}) {
           globals.refetch = refetch;
           var results = [];
-          var loading =
-              result.loading && result.source == QueryResultSource.Loading;
-          if (result.hasException) {
-            return ErrorDialog(result.exception.toString());
-          } else if (!loading) {
+          if (!result.loading && result.data != null) {
             results = getter(result.data) ?? [];
           }
-          // TODO(danj): QueryResultSource.Loading means no cache no network
-          // https://github.com/zino-app/graphql-flutter/issues/603
-          // https://github.com/zino-app/graphql-flutter/issues/153
-          plannedRefetch = false;
+          var shouldRefetch = false;
           List<Widget> items = results.map<Widget>((v) {
-            // some objects don't have a status field, so it's
-            // safe to delete; others must be finished in order
-            // to delete; i.e. if a dataset hasn't finished
-            // uploading and you try to delete it, it will try
-            // to a dataset before it exists
             final status = v["status"].toString();
-            final isError = status == "FAILED";
+            final isError = status == "FAILED" || result.hasException;
             final inProgress =
                 ["QUEUED", "RUNNING"].contains(v["status"].toString());
-            if (inProgress && !plannedRefetch) {
-              Future.delayed(Duration(milliseconds: 5000), refetch);
-              plannedRefetch = true;
-            }
-            return Card(
-                elevation: 3.0,
-                child: ListTile(
-                    onTap: () => onTap(v),
-                    trailing: Wrap(spacing: 12, children: <Widget>[
-                      Visibility(
-                          visible: isError,
-                          child: IconButton(
+            shouldRefetch = shouldRefetch || inProgress;
+            var children = <Widget>[
+              ListTile(
+                selected: v["id"].toString() == selectedId,
+                onTap: () => onTap(v),
+                trailing: Wrap(spacing: 12, children: <Widget>[
+                  Visibility(
+                      visible: isError || inProgress,
+                      child: isError
+                          ? IconButton(
                               onPressed: () => errorDialog(
                                   context: context,
-                                  message:
-                                      '''Error uploading dataset. Check to ensure it is a csv.'''),
-                              icon: Icon(Icons.error, size: 30))),
-                      IconButton(
+                                  message: result.exception.toString()),
+                              icon: Icon(Icons.error, size: 30))
+                          : IconButton(
+                              onPressed: () => {},
+                              icon: Icon(Icons.cloud_upload, size: 30))),
+                  Visibility(
+                      visible: canDelete?.call(v) ?? true,
+                      child: IconButton(
                           onPressed: () async {
-                            if (!inProgress) {
-                              final client = GraphQLProvider.of(context).value;
-                              final queryOpts = QueryOptions(
-                                fetchPolicy: FetchPolicy.networkOnly,
-                                documentNode: gql(deleteQuery),
-                                variables: {"id": v["id"].toString()},
-                              );
-                              var res = await client.query(queryOpts);
-                              if (res.hasException) {
-                                errorDialog(
-                                    context: context,
-                                    message: res.exception.toString());
-                              }
-                              refetch();
+                            final client = GraphQLProvider.of(context).value;
+                            final queryOpts = QueryOptions(
+                              fetchPolicy: FetchPolicy.networkOnly,
+                              documentNode: gql(deleteQuery),
+                              variables: {"id": v["id"].toString()},
+                            );
+                            var res = await client.query(queryOpts);
+                            if (res.hasException) {
+                              errorDialog(
+                                  context: context,
+                                  message: res.exception.toString());
                             }
+                            refetch();
                           },
-                          icon: inProgress
-                              ? Icon(Icons.cloud_upload, size: 30.0)
-                              : Icon(Icons.delete_outline, size: 30.0))
-                    ]),
-                    title: Text(v['name'].toString(),
-                        style: TextStyle(fontSize: 20))));
+                          icon: Icon(Icons.delete_outline, size: 30.0)))
+                ]),
+                title: Text(title(v), style: TextStyle(fontSize: 20)),
+                subtitle: subtitle?.call(v),
+              )
+            ];
+            if (this.below != null) {
+              children.add(this.below(v));
+            }
+            return Card(elevation: 0.0, child: Column(children: children));
           }).toList();
+
+          if (shouldRefetch && result.source == QueryResultSource.Network) {
+            Future.delayed(Duration(milliseconds: 10000), refetch);
+          }
 
           return SearchableList(
               items: items,
-              getter: (item) => item.child.title.data,
-              loading: loading);
+              getter: (item) => item.child.children[0].title.data,
+              loading: result.loading);
         });
   }
 }

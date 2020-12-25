@@ -1,10 +1,12 @@
-use crate::{models::User, ContextData, Error, ModelKeys, Mutation, Query};
+use crate::{
+    models::User, utils::run_mode, ContextData, Error, ModelKeys, Mutation,
+    Query,
+};
 use async_graphql::{
     from_value, Context, EmptySubscription, Error as GQLError,
     Request as GQLRequest, Response as GQLResponse, Result as GQLResult,
     Schema, Value as GQLValue, ID,
 };
-use rusoto_core::Region;
 use serde::de::DeserializeOwned;
 use std::str;
 use uuid::Uuid;
@@ -33,20 +35,14 @@ pub fn from_response<T: DeserializeOwned>(res: GQLResponse) -> GQLResult<T> {
     Err(Error::Serde.into())
 }
 
-pub fn get_invocation_type<'ctx>(ctx: &'ctx Context<'_>) -> Option<String> {
+pub fn get_invocation_type() -> Option<String> {
     // TODO(danj): can't invoke async locally [invocation_type Some("Event")]
     // https://github.com/aws/aws-sam-cli/pull/749
     // None defaults to RequestResponse
-    match data(ctx) {
-        Ok(d) => {
-            // async
-            if d.region == Region::UsWest1 {
-                Some("Event".to_owned())
-            } else {
-                None
-            }
-        }
-        Err(_) => None,
+    if run_mode().as_str() != "local" {
+        Some("Event".to_owned())
+    } else {
+        None
     }
 }
 
@@ -93,13 +89,14 @@ pub async fn respond(req: GQLRequest, ctx: &ContextData) -> GQLResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{models::User, queries::*, Db, GenericError};
+    use crate::{
+        models::User, queries::*, utils::vars_to_json_string, GenericError,
+    };
     use async_graphql::Result as GQLResult;
     use rusoto_core::Region;
     use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
     use sqlx::{query, Result as SQLxResult};
-    use std::process::Command;
-    use std::{thread, time};
+    use std::{env, process::Command, thread, time};
     use tokio_compat_02::FutureExt;
 
     #[tokio::test]
@@ -113,8 +110,9 @@ mod tests {
     }
 
     fn sam_local_start_lambda() -> std::process::Child {
+        env::set_var("RUN_MODE", "local");
         Command::new("sam")
-            .args(&["local", "start-lambda"])
+            .args(&["local", "start-lambda", "--env-vars", "test_env.json"])
             .current_dir("../..")
             .spawn()
             .expect("unable to start sam local lambda service")
@@ -131,20 +129,19 @@ mod tests {
         };
         let lambda = LambdaClient::new(region);
 
-        // create project2
+        // create project
         let mut res =
             respond(create_project(&[("name", "Test Project")]), &ctx).await;
-        let mut p: ProjectResponse = from_response(res)?;
-        let project_id = p.id;
+        let mut project: ProjectResponse = from_response(res)?;
 
         // make project public
         res = respond(
-            make_project_public(&[("projectId", &project_id.clone())]),
+            make_project_public(&[("projectId", &project.id.clone())]),
             &ctx,
         )
         .await;
-        p = from_response(res)?;
-        if !p.is_public {
+        project = from_response(res)?;
+        if !project.is_public {
             return Err(GQLError::new("failed to make project public"));
         }
 
@@ -152,47 +149,181 @@ mod tests {
         let new_project_name = "Test Project Renamed";
         res = respond(
             rename_project(&[
-                ("projectId", &project_id.clone()),
+                ("projectId", &project.id.clone()),
                 ("name", new_project_name),
             ]),
             &ctx,
         )
         .await;
-        p = from_response(res)?;
-        if p.name != new_project_name {
+        project = from_response(res)?;
+        if project.name != new_project_name {
             return Err(GQLError::new("failed to rename project"));
         }
 
         // create dataset
         res = respond(create_dataset(&[
-            ("projectId", &project_id.clone()),
+            ("projectId", &project.id.clone()),
             ("name", "iris"),
             ("uri", "https://drive.google.com/file/d/12q0KWJAUaVba9RZrVY8QEXThK1x5GoF8/view?usp=sharing")
         ]), &ctx).await;
-        let mut ds: DatasetResponse = from_response(res)?;
-        let dataset_id = ds.id;
+        let mut dataset: DatasetResponse = from_response(res)?;
 
         // rename dataset
         let new_dataset_name = "iris renamed";
         res = respond(
             rename_dataset(&[
-                ("datasetId", &dataset_id.clone()),
+                ("datasetId", &dataset.id.clone()),
                 ("name", new_dataset_name),
             ]),
             &ctx,
         )
         .await;
-        ds = from_response(res)?;
-        if ds.name != new_dataset_name {
+        dataset = from_response(res)?;
+        if dataset.name != new_dataset_name {
             return Err(GQLError::new("failed to rename dataset"));
         }
 
-        // delete project
+        // create analysis
         res = respond(
-            delete_project(&[("projectId", &project_id.clone())]),
+            create_analysis(&[
+                ("datasetId", &dataset.id.clone()),
+                ("name", "test analysis"),
+            ]),
             &ctx,
         )
         .await;
+        let mut analysis: AnalysisResponse = from_response(res)?;
+
+        // rename analysis
+        let new_analysis_name = "test analysis renamed";
+        res = respond(
+            rename_analysis(&[
+                ("analysisId", &analysis.id.clone()),
+                ("name", new_analysis_name),
+            ]),
+            &ctx,
+        )
+        .await;
+        analysis = from_response(res)?;
+        if analysis.name != new_analysis_name {
+            return Err(GQLError::new("failed to rename analysis"));
+        }
+
+        // create bar plot
+        res = respond(
+            create_plot(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("name", "bar"),
+                ("type", "BAR"),
+                (
+                    "args",
+                    &vars_to_json_string(&[
+                        ("x", "species"),
+                        ("color", "species"),
+                        ("title", "Species"),
+                    ]),
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        from_response::<PlotResponse>(res)?;
+
+        // create histogram plot
+        res = respond(
+            create_plot(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("name", "histogram"),
+                ("type", "HISTOGRAM"),
+                ("args", &vars_to_json_string(&[("x", "sepal_width")])),
+            ]),
+            &ctx,
+        )
+        .await;
+        from_response::<PlotResponse>(res)?;
+
+        // create line plot
+        res = respond(
+            create_plot(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("name", "histogram"),
+                ("type", "LINE"),
+                (
+                    "args",
+                    &vars_to_json_string(&[
+                        ("x", "sepal_width"),
+                        ("y", "petal_width"),
+                        ("title", "Sepal vs. Petal Width"),
+                        ("color", "species"),
+                    ]),
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        from_response::<PlotResponse>(res)?;
+
+        // create scatter plot
+        res = respond(
+            create_plot(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("name", "scatter"),
+                ("type", "SCATTER"),
+                (
+                    "args",
+                    &vars_to_json_string(&[
+                        ("x", "sepal_width"),
+                        ("y", "petal_width"),
+                        ("title", "Sepal vs. Petal Width"),
+                        ("color", "species"),
+                        ("shape", "species"),
+                    ]),
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        from_response::<PlotResponse>(res)?;
+
+        // create smooth plot
+        res = respond(
+            create_plot(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("name", "smooth plot"),
+                ("type", "SMOOTH"),
+                (
+                    "args",
+                    &vars_to_json_string(&[
+                        ("x", "sepal_width"),
+                        ("y", "petal_width"),
+                        ("title", "Sepal vs. Petal Width"),
+                        ("color", "species"),
+                        ("shape", "species"),
+                    ]),
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        let mut plot = from_response::<PlotResponse>(res)?;
+
+        // rename plot
+        let new_plot_name = "smooth plot renamed";
+        res = respond(
+            rename_plot(&[
+                ("plotId", &plot.id.clone()),
+                ("name", new_plot_name),
+            ]),
+            &ctx,
+        )
+        .await;
+        plot = from_response(res)?;
+        if plot.name != new_plot_name {
+            return Err(GQLError::new("failed to rename plot"));
+        }
+
+        // delete project
+        res = respond(delete_node(&[("id", &project.id.clone())]), &ctx).await;
         if !res.is_ok() {
             return Err(GQLError::new("failed to delete project"));
         }
@@ -202,12 +333,8 @@ mod tests {
 
         // garbage collect resources
         let lambda_req = InvocationRequest {
-            client_context: None,
             function_name: "motoko-garbage-collect".to_owned(),
-            invocation_type: None,
-            log_type: None,
-            payload: None,
-            qualifier: None,
+            ..Default::default()
         };
         lambda.invoke(lambda_req).await?;
 
@@ -230,24 +357,24 @@ mod tests {
     }
 
     async fn reset_databases(ctx: &ContextData) -> SQLxResult<()> {
-        truncate_tables(&ctx.db).await?;
-        drop_views(&ctx.data_db).await?;
-        drop_tables(&ctx.data_db).await?;
+        truncate_tables(&ctx.db.meta).await?;
+        drop_views(&ctx.db.data).await?;
+        drop_tables(&ctx.db.data).await?;
         Ok(())
     }
 
-    async fn truncate_tables(db: &Db) -> SQLxResult<()> {
+    async fn truncate_tables(db: &sqlx::PgPool) -> SQLxResult<()> {
         query("SELECT truncate_tables()")
             .execute(db)
             .await
             .map(|_| ())
     }
 
-    async fn drop_tables(db: &Db) -> SQLxResult<()> {
+    async fn drop_tables(db: &sqlx::PgPool) -> SQLxResult<()> {
         query("SELECT drop_tables()").execute(db).await.map(|_| ())
     }
 
-    async fn drop_views(db: &Db) -> SQLxResult<()> {
+    async fn drop_views(db: &sqlx::PgPool) -> SQLxResult<()> {
         query("SELECT drop_views()").execute(db).await.map(|_| ())
     }
 }

@@ -14,8 +14,7 @@ CREATE TABLE plots (
   name TEXT NOT NULL,
   type PLOT_TYPE NOT NULL,
   args JSON NOT NULL,
-  status STATUS DEFAULT 'queued' NOT NULL,
-  uri TEXT UNIQUE
+  status STATUS DEFAULT 'queued' NOT NULL
 );
 CREATE INDEX plots_created_at_idx ON plots(created_at);
 CREATE INDEX plots_updated_at_idx ON plots(updated_at);

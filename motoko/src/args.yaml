@@ -19,6 +19,8 @@ subcommands:
                         about: build individual apks
                     - bundle:
                         about: build app bundle for Play Store
+            - backend:
+                about: build the backend serverless app
             - build-image:
                 about: build container image for automated deployment
             - garbage-collect:
@@ -47,6 +49,8 @@ subcommands:
                         about: deploy individual apks
                     - bundle:
                         about: deploy app bundle for Play Store
+            - backend:
+                about: deploy AWS SAM based backend
             - build-image:
                 about: deploy container image for automated deployment
             - garbage-collect:
@@ -55,10 +59,17 @@ subcommands:
                 about: deploy graphql lambda function
             - ios:
                 about: deploy iOS
-            - infer-datatypes:
-                about: deploy infer-datatypes lambda function
             - invalidate-cache:
                 about: deploy invalidate-cache lambda function
+            - plot:
+                about: deploy plot lambda function
+                args:
+                    - skip-deps:
+                        about: skip compiling and collecting dependencies
+                        short: s
+                        long: skip-deps
+                        required: false
+                        takes_value: false
             - uri-to-sql-db:
                 about: deploy uri-to-sql-db lambda function
             - last-commit:
@@ -85,8 +96,6 @@ subcommands:
         settings:
             - ArgRequiredElseHelp
         subcommands:
-            - connect-to-aws-db:
-                about: connects to aws database
             - frontend:
                 about: run frontend
                 settings:
@@ -122,26 +131,18 @@ subcommands:
                                   - payload:
                                       about: JSON payload
                                       required: true
-            - infer-datatypes:
-                about: infer data types using cloud function
-                args:
-                    - uri:
-                        about: URI of a dataset
-                        required: true
             - invalidate-cache:
                 about: invalidate CloudFront distribution cache
-            - reset-android-keystore:
-                about: resets keystore used for signing android apps
+            - reset-android-keystores:
+                about: resets keystores used for signing android apps
             - reset-databases:
                 about: resets the databases
-            - upload-backend-dotenv:
-                about: uploads motoko/backend/.env to secrets manager
-            - upload-debug-android-keystore:
-                about: uploads debug android keystore after reset
-            - setup-android-keystore:
+                settings:
+                    - ArgRequiredElseHelp
+                subcommands:
+                    - local:
+                        about: reset local databases
+                    - remote:
+                        about: reset remote databases
+            - setup-android-keystores:
                 about: sets up keystore locally for signing android apps
-            - setup-backend-dotenv:
-                about: >
-                  downloads motoko/backend/.env and links to
-                  motoko/backend/rs/graphql/.env and
-                  motoko/backend/rs/garbage-collect/.env

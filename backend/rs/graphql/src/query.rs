@@ -1,7 +1,9 @@
 use crate::{
     gql::{current_user, data, graphql_id_to_uuid},
     id_to_node,
-    models::{Analysis, Dataset, Dataview, Model, Plot, Statistic, User},
+    models::{
+        Analysis, Dataset, Dataview, Model, Plot, Project, Statistic, User,
+    },
     Node,
 };
 use async_graphql::{Context, Result, ID};
@@ -21,6 +23,24 @@ impl Query {
     async fn node(&self, ctx: &Context<'_>, id: ID) -> Result<Node> {
         let d = data(ctx)?;
         id_to_node(&d.db, &id).await
+    }
+
+    async fn projects(&self, ctx: &Context<'_>) -> Result<Vec<Project>> {
+        let d = data(ctx)?;
+        let user = current_user(ctx)?;
+        query_as(
+            r#"
+            SELECT p.*
+            FROM projects p
+            JOIN project_user_roles pur
+            ON p.uuid = pur.project_uuid
+            AND pur.user_uuid = $1
+            "#,
+        )
+        .bind(&user.uuid)
+        .fetch_all(&d.db.meta)
+        .await
+        .map_err(|e| e.into())
     }
 
     async fn datasets(
@@ -45,7 +65,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&project_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }
@@ -62,17 +82,17 @@ impl Query {
             r#"
             SELECT a.*
             FROM analyses a
-            JOIN projects p
-            ON p.uuid = a.project_uuid
+            JOIN datasets ds
+            ON a.dataset_uuid = ds.uuid
             JOIN project_user_roles pur
-            ON p.uuid = pur.project_uuid
+            ON ds.project_uuid = pur.project_uuid
             WHERE pur.user_uuid = $1
-            AND p.uuid = $2
+            AND ds.project_uuid = $2
             "#,
         )
         .bind(&user.uuid)
         .bind(&project_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }
@@ -97,7 +117,7 @@ impl Query {
         )
         .bind(&user.uuid)
         .bind(&project_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }
@@ -112,28 +132,51 @@ impl Query {
         let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
         query_as(
             r#"
-            WITH RECURSIVE sub_dataviews AS (
+            SELECT x.*
+            FROM (
+                -- children
+                WITH RECURSIVE sub_dataviews AS (
+                    SELECT dv1.*
+                    FROM dataviews dv1
+                    JOIN analyses a
+                    ON dv1.uuid = a.dataview_uuid
+                    JOIN datasets ds
+                    ON a.dataset_uuid = ds.uuid
+                    JOIN project_user_roles pur
+                    ON ds.project_uuid = pur.project_uuid
+                    AND pur.user_uuid = $1
+                    AND a.uuid = $2
+                    AND dv1.uuid != dv1.parent_uuid
+                    UNION ALL
+                    SELECT dv2.*
+                    FROM dataviews dv2
+                    JOIN sub_dataviews sdv
+                    ON sdv.uuid = dv2.parent_uuid
+                )
+                SELECT *
+                FROM sub_dataviews
+
+                UNION ALL
+
+                -- roots
                 SELECT dv1.*
                 FROM dataviews dv1
                 JOIN analyses a
                 ON dv1.uuid = a.dataview_uuid
+                JOIN datasets ds
+                ON a.dataset_uuid = ds.uuid
                 JOIN project_user_roles pur
-                ON a.project_uuid = pur.project_uuid
-                WHERE pur.user_uuid = $1
+                ON ds.project_uuid = pur.project_uuid
+                AND pur.user_uuid = $1
                 AND a.uuid = $2
-                UNION
-                SELECT dv2.*
-                FROM dataviews dv2
-                JOIN sub_dataviews sdv
-                ON sdv.uuid = dv2.parent_uuid
-            )
-            SELECT *
-            FROM sub_dataviews
+                AND dv1.uuid = dv1.parent_uuid
+            ) x
+            ORDER BY x.created_at
             "#,
         )
         .bind(&user.uuid)
         .bind(&analysis_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }
@@ -141,25 +184,30 @@ impl Query {
     async fn plots(
         &self,
         ctx: &Context<'_>,
-        analysis_id: ID,
+        dataview_id: ID,
     ) -> Result<Vec<Plot>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
         query_as(
             r#"
-            SELECT pl.*
-            FROM plots pl
+            SELECT x.*
+            FROM plots x
+            JOIN dataviews dv
+            ON x.dataview_uuid = dv.uuid
+            AND dv.uuid = $1
             JOIN analyses a
-            ON pl.analysis_uuid = a.uuid
+            ON dv.analysis_uuid = a.uuid
+            JOIN datasets ds
+            ON a.dataset_uuid = ds.uuid
             JOIN project_user_roles pur
-            ON a.project_uuid = pur.project_uuid
-            WHERE pur.user_uuid = $1
+            ON ds.project_uuid = pur.project_uuid
+            AND pur.user_uuid = $2
             "#,
         )
+        .bind(&dataview_uuid)
         .bind(&user.uuid)
-        .bind(&analysis_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }
@@ -167,25 +215,30 @@ impl Query {
     async fn statistics(
         &self,
         ctx: &Context<'_>,
-        analysis_id: ID,
+        dataview_id: ID,
     ) -> Result<Vec<Statistic>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
         query_as(
             r#"
-            SELECT s.*
-            FROM statistics s
+            SELECT x.*
+            FROM statistics x
+            JOIN dataviews dv
+            ON x.dataview_uuid = dv.uuid
+            AND dv.uuid = $1
             JOIN analyses a
-            ON s.analysis_uuid = a.uuid
+            ON dv.analysis_uuid = a.uuid
+            JOIN datasets ds
+            ON a.dataset_uuid = ds.uuid
             JOIN project_user_roles pur
-            ON a.project_uuid = pur.project_uuid
-            WHERE pur.user_uuid = $1
+            ON ds.project_uuid = pur.project_uuid
+            AND pur.user_uuid = $2
             "#,
         )
+        .bind(&dataview_uuid)
         .bind(&user.uuid)
-        .bind(&analysis_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }
@@ -193,25 +246,30 @@ impl Query {
     async fn models(
         &self,
         ctx: &Context<'_>,
-        analysis_id: ID,
+        dataview_id: ID,
     ) -> Result<Vec<Model>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
         query_as(
             r#"
-            SELECT m.*
-            FROM models m
+            SELECT x.*
+            FROM models x
+            JOIN dataviews dv
+            ON x.dataview_uuid = dv.uuid
+            AND dv.uuid = $1
             JOIN analyses a
-            ON m.analysis_uuid = a.uuid
+            ON dv.analysis_uuid = a.uuid
+            JOIN datasets ds
+            ON a.dataset_uuid = ds.uuid
             JOIN project_user_roles pur
-            ON a.project_uuid = pur.project_uuid
-            WHERE pur.user_uuid = $1
+            ON ds.project_uuid = pur.project_uuid
+            AND pur.user_uuid = $2
             "#,
         )
+        .bind(&dataview_uuid)
         .bind(&user.uuid)
-        .bind(&analysis_uuid)
-        .fetch_all(&d.db)
+        .fetch_all(&d.db.meta)
         .await
         .map_err(|e| e.into())
     }

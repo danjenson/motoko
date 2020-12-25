@@ -46,7 +46,7 @@ impl ProjectUserRole {
         .bind(project_uuid)
         .bind(user_uuid)
         .bind(role)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -65,7 +65,7 @@ impl ProjectUserRole {
         )
         .bind(project_uuid)
         .bind(user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -87,7 +87,7 @@ impl ProjectUserRole {
         .bind(project_uuid)
         .bind(user_uuid)
         .bind(role)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -103,7 +103,7 @@ impl ProjectUserRole {
             "#,
         )
         .bind(project_uuid)
-        .fetch_all(db)
+        .fetch_all(&db.meta)
         .await
     }
 
@@ -116,7 +116,7 @@ impl ProjectUserRole {
             "#,
         )
         .bind(user_uuid)
-        .fetch_all(db)
+        .fetch_all(&db.meta)
         .await
     }
 
@@ -134,7 +134,7 @@ impl ProjectUserRole {
         )
         .bind(project_uuid)
         .bind(user_uuid)
-        .execute(db)
+        .execute(&db.meta)
         .await
         .map(|_| ())
     }

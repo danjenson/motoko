@@ -24,15 +24,14 @@ class AdaptiveButtons extends StatelessWidget {
                         child: InkWell(
                       onTap: bd.onTap,
                       child: Card(
-                          elevation: 3.0,
                           child: Center(
                               child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: <Widget>[
-                                Icon(bd.icon, size: 50.0),
-                                SizedBox(height: 5.0),
-                                Text(bd.name, style: TextStyle(fontSize: 20.0))
-                              ]))),
+                            Icon(bd.icon, size: 50.0),
+                            SizedBox(height: 5.0),
+                            Text(bd.name, style: TextStyle(fontSize: 20.0))
+                          ]))),
                     )))
                 .toList()));
   }

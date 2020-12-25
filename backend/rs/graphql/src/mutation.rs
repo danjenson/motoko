@@ -11,16 +11,15 @@ use crate::{
         ProjectUserRole, Role, Statistic, StatisticName, User,
         UserRefreshToken,
     },
-    types::UploadDatasetPayload,
-    utils::{
-        as_bytes, dataset_table_name, dataview_view_name, user_name_from_email,
-    },
+    types::{CreatePlotPayload, UploadDatasetPayload},
+    utils::{as_bytes, dataview_view_name, user_name_from_email},
     Error,
 };
-use async_graphql::{Context, Error as GQLError, Json as GQLJson, Result, ID};
-use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
+use async_graphql::{
+    Context, Error as GQLError, Json as GQLJson, Result as GQLResult, ID,
+};
+use rusoto_lambda::{InvocationRequest, Lambda};
 use serde_json::Value as Json;
-use sqlx::query;
 use tokio_compat_02::FutureExt;
 use uuid::Uuid;
 
@@ -33,7 +32,7 @@ impl Mutation {
         ctx: &Context<'_>,
         provider: Provider,
         token: String,
-    ) -> Result<Credentials> {
+    ) -> GQLResult<Credentials> {
         let d = data(ctx)?;
         let oauth2_user = match provider {
             Provider::Google => {
@@ -72,7 +71,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         refresh_token: String,
-    ) -> Result<Credentials> {
+    ) -> GQLResult<Credentials> {
         let d = data(ctx)?;
         let token = UserRefreshToken::get(&d.db, &refresh_token).await?;
         let user = User::get(&d.db, &token.user_uuid).await?;
@@ -92,7 +91,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         user_refresh_token_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let mkeys = model_keys(&user_refresh_token_id)?;
         let value = mkeys
@@ -111,7 +110,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         name: String,
-    ) -> Result<User> {
+    ) -> GQLResult<User> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         User::rename(&d.db, &user.uuid, &name)
@@ -119,21 +118,25 @@ impl Mutation {
             .map_err(|e| e.into())
     }
 
-    pub async fn delete_node(&self, ctx: &Context<'_>, id: ID) -> Result<ID> {
+    pub async fn delete_node(
+        &self,
+        ctx: &Context<'_>,
+        id: ID,
+    ) -> GQLResult<ID> {
         let mkeys = model_keys(&id)?;
         match mkeys.model.as_str() {
-            "Analysis" => Self::delete_analysis(&self, ctx, id).await,
-            "Dataset" => Self::delete_dataset(&self, ctx, id).await,
-            "Dataview" => Self::delete_dataview(&self, ctx, id).await,
-            "Model" => Self::delete_model(&self, ctx, id).await,
-            "Plot" => Self::delete_plot(&self, ctx, id).await,
-            "Project" => Self::delete_project(&self, ctx, id).await,
+            "Analysis" => Self::delete_analysis(&self, ctx, id).await?,
+            "Dataset" => Self::delete_dataset(&self, ctx, id).await?,
+            "Dataview" => Self::delete_dataview(&self, ctx, id).await?,
+            "Model" => Self::delete_model(&self, ctx, id).await?,
+            "Plot" => Self::delete_plot(&self, ctx, id).await?,
+            "Project" => Self::delete_project(&self, ctx, id).await?,
             "ProjectUserRole" => {
-                Self::delete_project_user_role(&self, ctx, id).await
+                Self::delete_project_user_role(&self, ctx, id).await?
             }
-            "Statistic" => Self::delete_statistic(&self, ctx, id).await,
+            "Statistic" => Self::delete_statistic(&self, ctx, id).await?,
             "UserRefreshToken" => {
-                Self::delete_user_refresh_token(&self, ctx, id).await
+                Self::delete_user_refresh_token(&self, ctx, id).await?
             }
             _ => Err(Error::UnsupportedOperation.into()),
         }
@@ -143,7 +146,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         name: String,
-    ) -> Result<Project> {
+    ) -> GQLResult<Project> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         Project::create(&d.db, &name, &user.uuid)
@@ -156,7 +159,7 @@ impl Mutation {
         ctx: &Context<'_>,
         project_id: ID,
         name: String,
-    ) -> Result<Project> {
+    ) -> GQLResult<Project> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
@@ -175,7 +178,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> Result<Project> {
+    ) -> GQLResult<Project> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
@@ -194,7 +197,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
@@ -216,7 +219,7 @@ impl Mutation {
         project_id: ID,
         name: String,
         uri: String,
-    ) -> Result<Dataset> {
+    ) -> GQLResult<Dataset> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
@@ -229,7 +232,6 @@ impl Mutation {
         let ds = Dataset::create(&d.db, &project_uuid, &name, &uri)
             .await
             .map_err(|e| -> GQLError { e.into() })?;
-        let lambda = LambdaClient::new(d.region.clone());
         let payload = UploadDatasetPayload {
             uri: uri.clone(),
             uuid: ds.uuid.clone(),
@@ -237,12 +239,12 @@ impl Mutation {
         let req = InvocationRequest {
             client_context: None,
             function_name: "motoko-uri-to-sql-db".to_owned(),
-            invocation_type: get_invocation_type(ctx),
+            invocation_type: get_invocation_type(),
             log_type: None,
             payload: Some(as_bytes(&payload)?),
             qualifier: None,
         };
-        lambda.invoke(req).compat().await?;
+        d.lambda.invoke(req).compat().await?;
         Ok(ds)
     }
 
@@ -251,7 +253,7 @@ impl Mutation {
         ctx: &Context<'_>,
         dataset_id: ID,
         name: String,
-    ) -> Result<Dataset> {
+    ) -> GQLResult<Dataset> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataset_uuid = graphql_id_to_uuid(&dataset_id)?;
@@ -270,7 +272,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         dataset_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataset_uuid = graphql_id_to_uuid(&dataset_id)?;
@@ -280,11 +282,6 @@ impl Mutation {
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        let table = dataset_table_name(&dataset_uuid);
-        query(&format!("DROP TABLE IF EXISTS {}", table))
-            .execute(&d.data_db)
-            .await
-            .map_err(|e| -> GQLError { e.into() })?;
         Dataset::delete(&d.db, &dataset_uuid)
             .await
             .map(|_| dataset_id)
@@ -297,7 +294,7 @@ impl Mutation {
         dataview_id: ID,
         operation: Operation,
         args: GQLJson<Json>,
-    ) -> Result<Dataview> {
+    ) -> GQLResult<Dataview> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
@@ -322,7 +319,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         dataview_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
@@ -338,11 +335,6 @@ impl Mutation {
         if dv.uuid == dv.parent_uuid {
             return Err("cannot delete root dataview".into());
         }
-        let view = dataview_view_name(&dataview_uuid);
-        query(&format!("DROP VIEW IF EXISTS {}", view))
-            .execute(&d.data_db)
-            .await
-            .map_err(|e| -> GQLError { e.into() })?;
         Dataview::delete(&d.db, &dataview_uuid)
             .await
             .map(|_| dataview_id)
@@ -354,7 +346,7 @@ impl Mutation {
         ctx: &Context<'_>,
         dataset_id: ID,
         name: String,
-    ) -> Result<Analysis> {
+    ) -> GQLResult<Analysis> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataset_uuid = graphql_id_to_uuid(&dataset_id)?;
@@ -374,7 +366,7 @@ impl Mutation {
         ctx: &Context<'_>,
         analysis_id: ID,
         name: String,
-    ) -> Result<Analysis> {
+    ) -> GQLResult<Analysis> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
@@ -394,7 +386,7 @@ impl Mutation {
         ctx: &Context<'_>,
         analysis_id: ID,
         dataview_id: ID,
-    ) -> Result<Analysis> {
+    ) -> GQLResult<Analysis> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
@@ -414,7 +406,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         analysis_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
@@ -436,7 +428,7 @@ impl Mutation {
         project_id: ID,
         user_id: ID,
         role: Role,
-    ) -> Result<ProjectUserRole> {
+    ) -> GQLResult<ProjectUserRole> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
@@ -458,7 +450,7 @@ impl Mutation {
         project_id: ID,
         user_id: ID,
         role: Role,
-    ) -> Result<ProjectUserRole> {
+    ) -> GQLResult<ProjectUserRole> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
@@ -497,7 +489,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_user_role_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let mkeys = model_keys(&project_user_role_id)?;
@@ -541,7 +533,7 @@ impl Mutation {
         dataview_id: ID,
         name: StatisticName,
         args: GQLJson<Json>,
-    ) -> Result<Statistic> {
+    ) -> GQLResult<Statistic> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
@@ -560,7 +552,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         statistic_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let statistic_uuid = graphql_id_to_uuid(&statistic_id)?;
@@ -583,7 +575,7 @@ impl Mutation {
         name: String,
         type_: PlotType,
         args: GQLJson<Json>,
-    ) -> Result<Plot> {
+    ) -> GQLResult<Plot> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
@@ -593,9 +585,23 @@ impl Mutation {
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Plot::create(&d.db, &dataview_uuid, &name, &type_, &args)
+        let p = Plot::create(&d.db, &dataview_uuid, &name, &type_, &args)
             .await
-            .map_err(|e| e.into())
+            .map_err(|e| -> GQLError { e.into() })?;
+        let payload = CreatePlotPayload {
+            view: dataview_view_name(&dataview_uuid),
+            uuid: p.uuid.clone(),
+            type_,
+            args: (*args).clone(),
+        };
+        let req = InvocationRequest {
+            function_name: "motoko-plot".to_owned(),
+            invocation_type: get_invocation_type(),
+            payload: Some(as_bytes(&payload)?),
+            ..Default::default()
+        };
+        d.lambda.invoke(req).compat().await?;
+        Ok(p)
     }
 
     pub async fn rename_plot(
@@ -603,7 +609,7 @@ impl Mutation {
         ctx: &Context<'_>,
         plot_id: ID,
         name: String,
-    ) -> Result<Plot> {
+    ) -> GQLResult<Plot> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let plot_uuid = graphql_id_to_uuid(&plot_id)?;
@@ -622,7 +628,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         plot_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let plot_uuid = graphql_id_to_uuid(&plot_id)?;
@@ -646,7 +652,7 @@ impl Mutation {
         target: Option<String>,
         features: Vec<String>,
         args: GQLJson<Json>,
-    ) -> Result<Model> {
+    ) -> GQLResult<Model> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
@@ -666,7 +672,7 @@ impl Mutation {
         ctx: &Context<'_>,
         model_id: ID,
         name: String,
-    ) -> Result<Model> {
+    ) -> GQLResult<Model> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let model_uuid = graphql_id_to_uuid(&model_id)?;
@@ -685,7 +691,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         model_id: ID,
-    ) -> Result<ID> {
+    ) -> GQLResult<ID> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let model_uuid = graphql_id_to_uuid(&model_id)?;

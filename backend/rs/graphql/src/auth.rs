@@ -1,5 +1,7 @@
 use crate::{models::User, Db, Error};
-use async_graphql::{Enum, Error as GQLError, Result, SimpleObject};
+use async_graphql::{
+    Enum, Error as GQLError, Result as GQLResult, SimpleObject,
+};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use lazy_static::lazy_static;
@@ -56,7 +58,7 @@ pub struct OAuth2User {
 pub fn credentials_for_user(
     jwt_secret: &str,
     user: &User,
-) -> Result<Credentials> {
+) -> GQLResult<Credentials> {
     use jsonwebtoken::{encode, EncodingKey, Header};
     let header = Header::default();
     let key = EncodingKey::from_secret(&jwt_secret.as_bytes());
@@ -108,7 +110,7 @@ pub fn extract_bearer_token(authorization_header: &str) -> Option<String> {
     })
 }
 
-pub fn user_uuid_from_token(token: &str, jwt_secret: &str) -> Result<Uuid> {
+pub fn user_uuid_from_token(token: &str, jwt_secret: &str) -> GQLResult<Uuid> {
     decode::<Claims>(
         &token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
@@ -122,11 +124,10 @@ pub fn user_uuid_from_token(token: &str, jwt_secret: &str) -> Result<Uuid> {
 pub async fn validate_google_id_token(
     google_oauth2_client_id: &str,
     token: &str,
-) -> Result<OAuth2User> {
+) -> GQLResult<OAuth2User> {
     // hitting the tokeninfo endpoint will decrypt the token if it is signed
     // with valid google credentials; an alternative would be to download
     // the credentials, since they are rotated infrequently
-    let err = Err(Error::InvalidIDToken.into());
     let decoded_token = reqwest::get(&format!(
         "https://oauth2.googleapis.com/tokeninfo?id_token={}",
         token
@@ -141,16 +142,18 @@ pub async fn validate_google_id_token(
     ]
     .contains(&decoded_token.iss)
     {
-        return err;
+        return Err(Error::InvalidIDToken("invalid issuer".into()).into());
     }
     // verify that the OAuth2 client ID is correct
     if decoded_token.aud != google_oauth2_client_id {
-        return err;
+        return Err(
+            Error::InvalidIDToken("incorrect OAuth2 Client ID".into()).into()
+        );
     }
     // verify that it has not expired
     let expires_at = decoded_token.exp.parse::<u64>().unwrap_or(0);
     if unixtime() > expires_at {
-        return err;
+        return Err(Error::InvalidIDToken("expired token".into()).into());
     }
     Ok(OAuth2User {
         display_name: decoded_token.name,

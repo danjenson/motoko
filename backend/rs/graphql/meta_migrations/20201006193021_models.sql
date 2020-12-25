@@ -7,11 +7,7 @@ CREATE TABLE models (
   target TEXT,
   features TEXT[] NOT NULL,
   args JSON,
-  status STATUS DEFAULT 'queued' NOT NULL,
-  transformer_uri TEXT UNIQUE,
-  estimator_uri TEXT UNIQUE,
-  evaluation JSON,
-  decisions JSON
+  status STATUS DEFAULT 'queued' NOT NULL
 );
 CREATE INDEX models_created_at_idx ON models(created_at);
 CREATE INDEX models_updated_at_idx ON models(updated_at);

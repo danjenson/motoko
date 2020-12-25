@@ -1,0 +1,9 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "motoko-backend"
+s3_bucket = "motoko-backend"
+s3_prefix = "motoko-backend"
+region = "us-west-1"
+capabilities = "CAPABILITY_IAM"

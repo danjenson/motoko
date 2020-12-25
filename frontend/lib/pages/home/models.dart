@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
 import 'searchable_list.dart';
-import 'model.dart' as m;
-import 'nav.dart';
 
 class Models extends StatelessWidget {
-  Models({@required this.nav, @required this.analysisID});
-  final Nav nav;
-  final String analysisID;
-  final List<String> modelIDs = ["model 1", "model 2", "model 3"];
+  Models(this.dataviewId);
+  final String dataviewId;
+  final List<String> modelIds = ["model 1", "model 2", "model 3"];
   @override
   Widget build(BuildContext context) {
     return SearchableList(
-        items: modelIDs
-            .map((modelID) => Card(
-                elevation: 3.0,
-                child: ListTile(
-                    onTap: () => nav.push(modelID, m.Model(modelID: modelID)),
-                    title: Text(modelID))))
+        items: modelIds
+            .map((modelId) =>
+                Card(elevation: 3.0, child: ListTile(title: Text(modelId))))
             .toList(),
         getter: (item) => item.child.title.data);
   }

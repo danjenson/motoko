@@ -2,6 +2,7 @@ use crate::{
     gql::data,
     models::{Dataset, Dataview, Role},
     types::Db,
+    utils::{dataset_table_name, dataview_view_name},
 };
 use async_graphql::{Context, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
@@ -26,11 +27,11 @@ impl Analysis {
         dataset_uuid: &Uuid,
         name: &str,
     ) -> SQLxResult<Self> {
-        query_as(
+        let analysis: Self = query_as(
             r#"
             WITH dv AS (
-                INSERT INTO dataviews (analysis_uuid, uuid, parent_uuid)
-                VALUES ($1, $3, $3)
+                INSERT INTO dataviews (analysis_uuid, uuid, parent_uuid, status)
+                VALUES ($1, $3, $3, 'completed')
                 RETURNING *
             )
             INSERT INTO analyses (uuid, dataset_uuid, dataview_uuid, name)
@@ -42,14 +43,22 @@ impl Analysis {
         .bind(dataset_uuid)
         .bind(Uuid::new_v4())
         .bind(name)
-        .fetch_one(db)
-        .await
+        .fetch_one(&db.meta)
+        .await?;
+        query(&format!(
+            "CREATE VIEW {} AS SELECT * FROM {}",
+            dataview_view_name(&analysis.dataview_uuid),
+            dataset_table_name(dataset_uuid)
+        ))
+        .execute(&db.data)
+        .await?;
+        Ok(analysis)
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
         query_as("SELECT * FROM analyses WHERE uuid = $1")
             .bind(uuid)
-            .fetch_one(db)
+            .fetch_one(&db.meta)
             .await
     }
 
@@ -64,7 +73,7 @@ impl Analysis {
         )
         .bind(uuid)
         .bind(name)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
@@ -88,7 +97,7 @@ impl Analysis {
         )
         .bind(&uuid)
         .bind(&user_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await?;
         Ok(row.0)
     }
@@ -108,14 +117,14 @@ impl Analysis {
         )
         .bind(uuid)
         .bind(dataview_uuid)
-        .fetch_one(db)
+        .fetch_one(&db.meta)
         .await
     }
 
     pub async fn delete(db: &Db, uuid: &Uuid) -> SQLxResult<()> {
-        query("DELETE FROM datasets WHERE uuid = $1")
+        query("DELETE FROM analyses WHERE uuid = $1")
             .bind(uuid)
-            .execute(db)
+            .execute(&db.meta)
             .await
             .map(|_| ())
     }

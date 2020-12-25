@@ -29,7 +29,12 @@ class GraphQL extends StatelessWidget {
     });
     var apiEndpoint = Provider.of<Tier>(context).apiEndpoint();
     var httpLink = HttpLink(uri: apiEndpoint);
-    var link = authLink.concat(errorLink).concat(httpLink);
+    var verbose = Link(request: (operation, [forward]) {
+      debugPrint('\n\n' + operation.variables.toString());
+      debugPrint(operation.document);
+      return forward(operation);
+    });
+    var link = verbose.concat(authLink).concat(errorLink).concat(httpLink);
     return GraphQLProvider(
         client: ValueNotifier(GraphQLClient(
             cache: NormalizedInMemoryCache(

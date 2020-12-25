@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'searchable_list.dart';
 
 class Permissions extends StatelessWidget {
-  Permissions({@required this.projectID});
-  final String projectID;
-  // TODO(danj): fetch using permissions(projectID)
+  Permissions({@required this.projectId});
+  final String projectId;
+  // TODO(danj): fetch using permissions(projectId)
   final List<String> permissions = ['user 1', 'user 2', 'user 3'];
   @override
   Widget build(BuildContext context) {

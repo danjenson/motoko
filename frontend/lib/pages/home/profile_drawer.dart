@@ -1,10 +1,10 @@
+import '../../common/accent_color.dart';
+import '../../common/auth.dart';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
-import '../../common/auth.dart';
-import '../../common/accent_color.dart';
-import 'dart:math' as math;
+import 'package:provider/provider.dart';
 
 class ProfileDrawer extends StatelessWidget {
   final double size = 25.0;
@@ -23,7 +23,6 @@ class ProfileDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     var accentColor = Provider.of<AccentColor>(context, listen: false);
     var auth = Provider.of<Auth>(context, listen: false);
-    // TODO(danj): loading screen
     return Query(
         options: QueryOptions(
           fetchPolicy: FetchPolicy.cacheAndNetwork,
@@ -37,9 +36,12 @@ class ProfileDrawer extends StatelessWidget {
                 DrawerHeader(
                     child: Center(
                         child: Column(children: <Widget>[
-                  Icon(Icons.account_circle,
-                      size: 100.0,
-                      color: Theme.of(context).colorScheme.secondary),
+                  Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.rotationY(math.pi),
+                      child: Icon(Icons.sports_motorsports_sharp,
+                          size: 100.0,
+                          color: Theme.of(context).colorScheme.secondary)),
                   SizedBox(height: 10.0),
                   Text(
                       result.data != null && result.data['me'] != null
