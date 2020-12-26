@@ -4,4 +4,4 @@ phases:
     commands:
       - git checkout dev
       - ./install_motoko_command
-      - motoko deploy last-commit
+      - motoko deploy all

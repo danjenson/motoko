@@ -17,7 +17,7 @@ pub use model::Model;
 pub use plot::{Plot, Type as PlotType};
 pub use project::Project;
 pub use project_user_role::{ProjectUserRole, Role};
-pub use statistic::{Name as StatisticName, Statistic};
+pub use statistic::{Statistic, Type as StatisticType};
 pub use status::Status;
 pub use user::User;
 pub use user_refresh_token::UserRefreshToken;

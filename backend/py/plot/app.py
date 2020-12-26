@@ -96,11 +96,11 @@ def columns(
     return {v for k, v in locals().items() if k != 'kwargs' and v}
 
 
-def plot(df, _type, args):
+def plot(df, _type, kwargs):
     return {
         func_name.split('_', 1)[1].upper(): globals()[func_name]
         for func_name in globals().keys() if func_name.startswith('plot_')
-    }[_type](df, **args)
+    }[_type](df, **kwargs)
 
 
 def plot_bar(df, x, color=None, **kwargs):

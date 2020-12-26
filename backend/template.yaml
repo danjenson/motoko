@@ -42,7 +42,16 @@ Resources:
     Properties:
       FunctionName: motoko-uri-to-sql-db
       Role: arn:aws:iam::902096072945:role/motoko-lambda
+      MemorySize: 4096
       CodeUri: py/uri-to-sql-db
+      Handler: app.lambda_handler
+      Runtime: python3.8
+  MotokoStatistic:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-statistic
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      CodeUri: py/statistic
       Handler: app.lambda_handler
       Runtime: python3.8
   MotokoPlot:
@@ -50,7 +59,7 @@ Resources:
     Properties:
       FunctionName: motoko-plot
       Role: arn:aws:iam::902096072945:role/motoko-lambda
-      MemorySize: 1024
+      MemorySize: 2048
       CodeUri: py/plot
       Handler: app.lambda_handler
       Runtime: python3.8

@@ -90,7 +90,10 @@ pub async fn respond(req: GQLRequest, ctx: &ContextData) -> GQLResponse {
 mod tests {
     use super::*;
     use crate::{
-        models::User, queries::*, utils::vars_to_json_string, GenericError,
+        models::{Status, User},
+        queries::*,
+        utils::vars_to_json_string,
+        GenericError,
     };
     use async_graphql::Result as GQLResult;
     use rusoto_core::Region;
@@ -119,7 +122,7 @@ mod tests {
     }
 
     async fn _graphql_round_trip() -> GQLResult<()> {
-        // setup
+        eprintln!("setting up");
         let ctx = test_ctx().await?;
 
         // create lambda client
@@ -129,7 +132,7 @@ mod tests {
         };
         let lambda = LambdaClient::new(region);
 
-        // create project
+        eprintln!("create project");
         let mut res =
             respond(create_project(&[("name", "Test Project")]), &ctx).await;
         let mut project: ProjectResponse = from_response(res)?;
@@ -145,7 +148,7 @@ mod tests {
             return Err(GQLError::new("failed to make project public"));
         }
 
-        // rename project
+        eprintln!("rename project");
         let new_project_name = "Test Project Renamed";
         res = respond(
             rename_project(&[
@@ -160,7 +163,7 @@ mod tests {
             return Err(GQLError::new("failed to rename project"));
         }
 
-        // create dataset
+        eprintln!("create dataset");
         res = respond(create_dataset(&[
             ("projectId", &project.id.clone()),
             ("name", "iris"),
@@ -168,7 +171,7 @@ mod tests {
         ]), &ctx).await;
         let mut dataset: DatasetResponse = from_response(res)?;
 
-        // rename dataset
+        eprintln!("rename dataset");
         let new_dataset_name = "iris renamed";
         res = respond(
             rename_dataset(&[
@@ -183,7 +186,7 @@ mod tests {
             return Err(GQLError::new("failed to rename dataset"));
         }
 
-        // create analysis
+        eprintln!("create analysis");
         res = respond(
             create_analysis(&[
                 ("datasetId", &dataset.id.clone()),
@@ -194,7 +197,7 @@ mod tests {
         .await;
         let mut analysis: AnalysisResponse = from_response(res)?;
 
-        // rename analysis
+        eprintln!("rename analysis");
         let new_analysis_name = "test analysis renamed";
         res = respond(
             rename_analysis(&[
@@ -209,7 +212,7 @@ mod tests {
             return Err(GQLError::new("failed to rename analysis"));
         }
 
-        // create bar plot
+        eprintln!("create bar plot");
         res = respond(
             create_plot(&[
                 ("dataviewId", &analysis.dataview.id.clone()),
@@ -227,9 +230,15 @@ mod tests {
             &ctx,
         )
         .await;
-        from_response::<PlotResponse>(res)?;
+        let mut plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
+        let mut s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create bar plot"));
+        }
 
-        // create histogram plot
+        eprintln!("create histogram plot");
         res = respond(
             create_plot(&[
                 ("dataviewId", &analysis.dataview.id.clone()),
@@ -240,9 +249,15 @@ mod tests {
             &ctx,
         )
         .await;
-        from_response::<PlotResponse>(res)?;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create histogram plot"));
+        }
 
-        // create line plot
+        eprintln!("create line plot");
         res = respond(
             create_plot(&[
                 ("dataviewId", &analysis.dataview.id.clone()),
@@ -261,9 +276,15 @@ mod tests {
             &ctx,
         )
         .await;
-        from_response::<PlotResponse>(res)?;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create line plot"));
+        }
 
-        // create scatter plot
+        eprintln!("create scatter plot");
         res = respond(
             create_plot(&[
                 ("dataviewId", &analysis.dataview.id.clone()),
@@ -283,9 +304,15 @@ mod tests {
             &ctx,
         )
         .await;
-        from_response::<PlotResponse>(res)?;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create scatter plot"));
+        }
 
-        // create smooth plot
+        eprintln!("create smooth plot");
         res = respond(
             create_plot(&[
                 ("dataviewId", &analysis.dataview.id.clone()),
@@ -305,10 +332,17 @@ mod tests {
             &ctx,
         )
         .await;
-        let mut plot = from_response::<PlotResponse>(res)?;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create smooth plot"));
+        }
 
-        // rename plot
+        eprintln!("rename smooth plot");
         let new_plot_name = "smooth plot renamed";
+        thread::sleep(time::Duration::from_secs(2));
         res = respond(
             rename_plot(&[
                 ("plotId", &plot.id.clone()),
@@ -322,16 +356,60 @@ mod tests {
             return Err(GQLError::new("failed to rename plot"));
         }
 
-        // delete project
-        res = respond(delete_node(&[("id", &project.id.clone())]), &ctx).await;
-        if !res.is_ok() {
-            return Err(GQLError::new("failed to delete project"));
+        eprintln!("create statistic - correlation");
+        res = respond(
+            create_statistic(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("type", "CORRELATION"),
+                (
+                    "args",
+                    &vars_to_json_string(&[
+                        ("x", "sepal_width"),
+                        ("y", "petal_width"),
+                    ]),
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        let mut stat = from_response::<StatisticResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&[("id", &stat.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new(
+                "failed to create statistic - correlation",
+            ));
         }
+
+        eprintln!("create statistic - summary");
+        res = respond(
+            create_statistic(&[
+                ("dataviewId", &analysis.dataview.id.clone()),
+                ("type", "SUMMARY"),
+                ("args", &vars_to_json_string(&[("x", "sepal_width")])),
+            ]),
+            &ctx,
+        )
+        .await;
+        stat = from_response::<StatisticResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&[("id", &stat.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create statistic - summary"));
+        }
+
+        // eprintln!("delete project");
+        // res = respond(delete_node(&[("id", &project.id.clone())]), &ctx).await;
+        // if !res.is_ok() {
+        //     return Err(GQLError::new("failed to delete project"));
+        // }
 
         // TODO(danj): 'no entry found for key "lambda-runtime-invoked-function-arn"'
         // https://github.com/aws/aws-lambda-runtime-interface-emulator/issues/11
 
-        // garbage collect resources
+        eprintln!("garbage collect");
         let lambda_req = InvocationRequest {
             function_name: "motoko-garbage-collect".to_owned(),
             ..Default::default()

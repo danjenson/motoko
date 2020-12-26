@@ -63,17 +63,10 @@ subcommands:
                 about: deploy invalidate-cache lambda function
             - plot:
                 about: deploy plot lambda function
-                args:
-                    - skip-deps:
-                        about: skip compiling and collecting dependencies
-                        short: s
-                        long: skip-deps
-                        required: false
-                        takes_value: false
+            - statistic:
+                about: deploy statistic lambda function
             - uri-to-sql-db:
                 about: deploy uri-to-sql-db lambda function
-            - last-commit:
-                about: build and deploy last commit
             - web:
                 about: deploy website
     - install:

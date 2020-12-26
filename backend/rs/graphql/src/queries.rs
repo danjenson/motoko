@@ -1,5 +1,5 @@
 use crate::{
-    models::{Operation, PlotType, Status},
+    models::{Operation, PlotType, StatisticType, Status},
     utils::vars_to_variables,
     ColumnDataType, Json, Vars,
 };
@@ -280,7 +280,8 @@ pub fn create_plot(vars: &Vars) -> Request {
                 dataviewId: $dataviewId,
                 name: $name,
                 type: $type,
-                args: $args) {{
+                args: $args,
+            ) {{
                 {}
             }}
         }}
@@ -302,6 +303,92 @@ pub fn rename_plot(vars: &Vars) -> Request {
         }}
         "#,
             PLOT_FRAGMENT,
+        ),
+        vars,
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusResponse {
+    #[serde(rename = "__typename")]
+    pub typename: String,
+    pub id: String,
+    pub status: Status,
+}
+
+pub fn status(vars: &Vars) -> Request {
+    make_request(
+        r#"
+        query Node($id: ID!) {
+            node(id: $id) {
+                __typename
+                id
+                ... on Dataview {
+                    status
+                }
+                ... on Statistic {
+                    status
+                }
+                ... on Plot {
+                    status
+                }
+                ... on Model {
+                    status
+                }
+            }
+        }
+        "#
+        .to_owned(),
+        vars,
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatisticResponse {
+    #[serde(rename = "__typename")]
+    pub typename: String,
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    #[serde(rename = "type")]
+    pub type_: StatisticType,
+    pub args: Json,
+    pub status: Status,
+    pub value: Option<Json>,
+}
+
+const STATISTIC_FRAGMENT: &'static str = r#"
+    __typename 
+    id
+    createdAt
+    updatedAt
+    type
+    args
+    status
+    value
+"#;
+
+pub fn create_statistic(vars: &Vars) -> Request {
+    make_request(
+        format!(
+            r#"
+        mutation CreateStatistic(
+            $dataviewId: ID!,
+            $type: StatisticType!,
+            $args: JSON!,
+        ) {{
+            createStatistic(
+                dataviewId: $dataviewId,
+                type: $type,
+                args: $args,
+            ) {{
+                {}
+            }}
+        }}
+        "#,
+            STATISTIC_FRAGMENT,
         ),
         vars,
     )

@@ -8,20 +8,19 @@ use chrono::{DateTime, Utc};
 use node_derive::node;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
-use sqlx::{self, query, query_as, FromRow, Result as SQLxResult, Type};
+use sqlx::{self, query, query_as, FromRow, Result as SQLxResult};
 use uuid::Uuid;
 
 #[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Enum, Type,
+    Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Enum, sqlx::Type,
 )]
-#[graphql(name = "StatisticName")]
-#[sqlx(rename = "STATISTIC_NAME")]
+#[graphql(name = "StatisticType")]
+#[sqlx(rename = "STATISTIC_TYPE")]
 #[sqlx(rename_all = "snake_case")]
-pub enum Name {
+#[serde(rename_all = "UPPERCASE")]
+pub enum Type {
     Correlation,
-    Mean,
-    Median,
-    Mode,
+    Summary,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
@@ -30,51 +29,38 @@ pub struct Statistic {
     pub updated_at: DateTime<Utc>,
     pub dataview_uuid: Uuid,
     pub uuid: Uuid,
-    pub name: Name,
+    #[sqlx(rename = "type")]
+    pub type_: Type,
     pub args: Json,
     pub status: Status,
-    pub value: Option<f64>,
+    pub value: Option<Json>,
 }
 
 impl Statistic {
     pub async fn create(
         db: &Db,
         dataview_uuid: &Uuid,
-        name: &Name,
+        type_: &Type,
         args: &Json,
     ) -> SQLxResult<Self> {
         query_as(
             r#"
-            INSERT INTO statistics (dataview_uuid, name, args)
+            INSERT INTO statistics (dataview_uuid, type, args)
             VALUES ($1, $2, $3) RETURNING *
             "#,
         )
         .bind(dataview_uuid)
-        .bind(name)
+        .bind(type_)
         .bind(args)
         .fetch_one(&db.meta)
         .await
     }
 
     pub async fn get(db: &Db, uuid: &Uuid) -> SQLxResult<Self> {
-        query_as(
-            r#"
-            SELECT
-                created_at,
-                updated_at,
-                dataview_uuid,
-                uuid,
-                name as "name: Name",
-                args,
-                status as "status: Status",
-                value
-            FROM statistics
-            WHERE uuid = $1
-            "#,
-        )
-        .bind(uuid)
-        .fetch_one(&db.meta)
-        .await
+        query_as("SELECT * FROM statistics WHERE uuid = $1")
+            .bind(uuid)
+            .fetch_one(&db.meta)
+            .await
     }
 
     pub async fn role(
@@ -133,8 +119,9 @@ impl Statistic {
             .map_err(|e| e.into())
     }
 
-    pub async fn name(&self) -> &Name {
-        &self.name
+    #[graphql(name = "type")]
+    pub async fn type_(&self) -> &Type {
+        &self.type_
     }
 
     pub async fn args(&self) -> GQLJson<Json> {
@@ -145,7 +132,7 @@ impl Statistic {
         &self.status
     }
 
-    pub async fn value(&self) -> &Option<f64> {
-        &self.value
+    pub async fn value(&self) -> Option<GQLJson<Json>> {
+        self.value.to_owned().map(|v| GQLJson(v))
     }
 }

@@ -1,9 +1,8 @@
 use clap::{load_yaml, App, ArgMatches};
-use regex::Regex;
 use std::{
     env,
-    fs::{self, create_dir_all, read_dir, remove_file, File},
-    io::{self, Write},
+    fs::{create_dir_all, read_dir, remove_file, File},
+    io::Write,
     os::unix::fs::symlink,
     path::Path,
     process::{exit, Command, ExitStatus, Stdio},
@@ -353,14 +352,12 @@ fn deploy(args: &ArgMatches) {
             build_and_deploy_rust_lambda("backend/rs/graphql", "graphql")
         }
         Some(("ios", _)) => deploy_ios(),
-        Some(("invalidate-cache", args)) => {
-            deploy_python_lambda("invalidate-cache", args)
+        Some(("invalidate-cache", _)) => {
+            deploy_python_lambda("invalidate-cache")
         }
-        Some(("plot", args)) => deploy_python_lambda("plot", args),
-        Some(("uri-to-sql-db", args)) => {
-            deploy_python_lambda("uri-to-sql-db", args)
-        }
-        Some(("last-commit", args)) => deploy_last_commit(args),
+        Some(("plot", _)) => deploy_python_lambda("plot"),
+        Some(("statistic", _)) => deploy_python_lambda("statistic"),
+        Some(("uri-to-sql-db", _)) => deploy_python_lambda("uri-to-sql-db"),
         Some(("web", _)) => deploy_web(),
         _ => quit("invalid deploy target!"),
     }
@@ -368,11 +365,10 @@ fn deploy(args: &ArgMatches) {
 
 fn deploy_all() {
     ensure_on_branch(&["dev", "prod"]);
-    deploy_backend();
+    // TODO(danj): figure out how to install AWS SAM
+    // deploy_backend();
     build_android_apks();
     deploy_android_apks();
-    build_web();
-    deploy_web();
 }
 
 fn deploy_backend() {
@@ -476,42 +472,17 @@ fn deploy_build_image() {
     );
 }
 
-fn deploy_python_lambda(name: &str, args: &ArgMatches) {
+fn deploy_python_lambda(name: &str) {
     // TODO(danj): should this only be on dev and prod branches?
     // ensure_on_branch(&["dev", "prod"]);
     // ensure_clean(&dir);
-    let skip_deps = args.is_present("skip-deps");
     let dir = format!("backend/py/{}", name);
     let zip_path = format!("/tmp/{}.zip", name);
     let fileb_zip_path = &format!("fileb://{}", zip_path);
-    let compile_reqs = format!("{}/compile-requirements.txt", dir);
     let reqs = format!("{}/requirements.txt", dir);
     let deps = format!("{}/deps", &dir);
-    if Path::new(&compile_reqs).exists() & !skip_deps {
-        run_from(
-            ".",
-            "pip",
-            &[
-                "install",
-                "--no-cache-dir",
-                "--compile",
-                "--global-option",
-                "build_ext",
-                "--global-option",
-                "-Os -g0 --strip-all",
-                "--global-option",
-                "-j 4",
-                "-r",
-                &compile_reqs,
-                "--target",
-                &deps,
-            ],
-        );
-    }
-    if Path::new(&reqs).exists() & !skip_deps {
-        run_from(".", "pip", &["install", "-r", &reqs, "--target", &deps]);
-    }
     remove_file_if_exists(&zip_path);
+    run_from(".", "pip", &["install", "-r", &reqs, "--target", &deps]);
     run_from(&deps, "zip", &["-r9", &zip_path, "."]);
     run_from(&dir, "zip", &["-g", &zip_path, "app.py"]);
     let function_name = lambda_function_name(name);
@@ -563,40 +534,6 @@ fn lambda_function_name(bin_name: &str) -> String {
 fn deploy_ios() {
     ensure_on_branch(&["dev", "prod"]);
     quit("deploying iOS frontend is not yet supported!");
-}
-
-fn deploy_last_commit(args: &ArgMatches) {
-    ensure_on_branch(&["dev", "prod"]);
-    let modified_files =
-        &run_from(".", "git", &["diff", "--name-only", "HEAD", "HEAD~1"]);
-    let msg = "unable to read python backend directory";
-    let pys = fs::read_dir("/data/repos/motoko/backend/py")
-        .expect(msg)
-        .map(|res| res.map(|e| e.file_name()))
-        .collect::<Result<Vec<_>, io::Error>>()
-        .expect(msg);
-    pys.iter().for_each(|f| {
-        let func = f.to_str().unwrap();
-        if Regex::new(&format!("(^|[[:^alpha:]])backend/py/{}", func))
-            .unwrap()
-            .is_match(modified_files)
-        {
-            deploy_python_lambda(func, args);
-        }
-    });
-    let frontend = Regex::new("(^|[[:^alpha:]])frontend").unwrap();
-    let graphql = Regex::new("(^|[[:^alpha:]])backend/rs/graphql").unwrap();
-    // execute in topological order
-    if graphql.is_match(modified_files) {
-        build_and_deploy_rust_lambda("backend/rs/graphql", "graphql");
-        build_and_deploy_rust_lambda("backend/rs/graphql", "garbage-collect");
-    }
-    if frontend.is_match(modified_files) {
-        build_android_apks();
-        deploy_android_apks();
-        build_web();
-        deploy_web();
-    }
 }
 
 fn deploy_web() {

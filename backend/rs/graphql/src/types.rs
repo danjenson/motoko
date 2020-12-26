@@ -1,4 +1,4 @@
-use crate::models::PlotType;
+use crate::models::{PlotType, StatisticType};
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -31,6 +31,15 @@ pub struct CreatePlotPayload {
     pub uuid: Uuid,
     #[serde(rename = "type")]
     pub type_: PlotType,
+    pub args: Json,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateStatisticPayload {
+    pub view: String,
+    pub uuid: Uuid,
+    #[serde(rename = "type")]
+    pub type_: StatisticType,
     pub args: Json,
 }
 

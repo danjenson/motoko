@@ -8,10 +8,10 @@ use crate::{
     },
     models::{
         Analysis, Dataset, Dataview, Model, Operation, Plot, PlotType, Project,
-        ProjectUserRole, Role, Statistic, StatisticName, User,
+        ProjectUserRole, Role, Statistic, StatisticType, User,
         UserRefreshToken,
     },
-    types::{CreatePlotPayload, UploadDatasetPayload},
+    types::{CreatePlotPayload, CreateStatisticPayload, UploadDatasetPayload},
     utils::{as_bytes, dataview_view_name, user_name_from_email},
     Error,
 };
@@ -531,7 +531,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         dataview_id: ID,
-        name: StatisticName,
+        type_: StatisticType,
         args: GQLJson<Json>,
     ) -> GQLResult<Statistic> {
         let d = data(ctx)?;
@@ -543,9 +543,23 @@ impl Mutation {
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Statistic::create(&d.db, &dataview_uuid, &name, &args)
+        let s = Statistic::create(&d.db, &dataview_uuid, &type_, &args)
             .await
-            .map_err(|e| e.into())
+            .map_err(|e| -> GQLError { e.into() })?;
+        let payload = CreateStatisticPayload {
+            view: dataview_view_name(&dataview_uuid),
+            uuid: s.uuid.clone(),
+            type_,
+            args: (*args).clone(),
+        };
+        let req = InvocationRequest {
+            function_name: "motoko-statistic".to_owned(),
+            invocation_type: get_invocation_type(),
+            payload: Some(as_bytes(&payload)?),
+            ..Default::default()
+        };
+        d.lambda.invoke(req).compat().await?;
+        Ok(s)
     }
 
     pub async fn delete_statistic(

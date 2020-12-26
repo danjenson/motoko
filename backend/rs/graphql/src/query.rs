@@ -13,10 +13,7 @@ pub struct Query;
 
 #[async_graphql::Object]
 impl Query {
-    async fn me<'ctx>(
-        &'ctx self,
-        ctx: &'ctx Context<'_>,
-    ) -> Result<&'ctx User> {
+    async fn me<'ctx>(&self, ctx: &'ctx Context<'_>) -> Result<&'ctx User> {
         current_user(ctx)
     }
 

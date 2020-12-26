@@ -3,17 +3,23 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- remove dropdownmenu flutter dependency
+- remove dropdownmenu flutter dependency - 25
 - calculate statistic
-- transform data
+  - backend - 25
+  - frontend - 25
+- transform data (select, filter, summarize)
+  - backend - 26
+  - frontend - 26
 - model
+  - backend - 27, 28
+  - frontend - 29, 30
+- add users to project - 31
+- custom plot theme - 31
 - allow cloning projects
-- copy plots/stats/models when dataview updated
 - custom errors from lambda or API gateway if it doesn't even load
 - separate error messages for dev vs prod:
   - https://doc.rust-lang.org/reference/conditional-compilation.html
   - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
-- type args instead of using Null/serde_json::Value
 - create test databases for cloudbuild unittests
 - fix sliding up panel: https://github.com/akshathjain/sliding_up_panel/issues/193
 - async SAM invoke: https://github.com/aws/aws-sam-cli/pull/749
@@ -258,3 +264,4 @@ __GOTCHAS__:
   connections:
   - `select usename from pg_stat_activity;`
   - `select pg_terminate_backend(pid) from pg_stat_activity where usename='motoko';`
+- Don't use double quotes in `psycopg2` queries
