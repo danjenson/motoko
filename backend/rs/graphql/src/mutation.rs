@@ -11,7 +11,7 @@ use crate::{
         ProjectUserRole, Role, Statistic, StatisticType, User,
         UserRefreshToken,
     },
-    types::{CreatePlotPayload, CreateStatisticPayload, UploadDatasetPayload},
+    types::*,
     utils::{as_bytes, dataview_view_name, user_name_from_email},
     Error,
 };
@@ -49,8 +49,8 @@ impl Mutation {
             Err(_) => {
                 User::create(
                     &d.db,
-                    &user_name_from_email(&oauth2_user.email),
                     &oauth2_user.display_name,
+                    &user_name_from_email(&oauth2_user.email),
                     &oauth2_user.email,
                 )
                 .await?
@@ -291,28 +291,43 @@ impl Mutation {
     pub async fn create_dataview(
         &self,
         ctx: &Context<'_>,
-        dataview_id: ID,
+        analysis_id: ID,
         operation: Operation,
         args: GQLJson<Json>,
     ) -> GQLResult<Dataview> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
-        let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
-        let role = Dataview::role(&d.db, &dataview_uuid, &user.uuid)
+        let analysis_uuid = graphql_id_to_uuid(&analysis_id)?;
+        let role = Analysis::role(&d.db, &analysis_uuid, &user.uuid)
             .await
             .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Dataview::create(&d.db, &dataview_uuid, &operation, &args)
+        let a = Analysis::get(&d.db, &analysis_uuid)
             .await
-            .map_err(|e| e.into())
-        // TODO(danj): copy (to avoid on delete casade problems)
-        // plots/statistics/models that are still valid?
-        // select,sort,mutate are valid
-        // Plot::link_if_valid(&d.db, &dv.uuid)
-        // Statistic::link_if_valid(&d.db, &dv.uuid)
-        // Model::link_if_valid(&d.db, &dv.uuid)
+            .map_err(|e| -> GQLError { e.into() })?;
+        let dv = Dataview::create(&d.db, &a.dataview_uuid, &operation, &args)
+            .await
+            .map_err(|e| -> GQLError { e.into() })?;
+        Analysis::point_to(&d.db, &analysis_uuid, &dv.uuid)
+            .await
+            .map_err(|e| -> GQLError { e.into() })?;
+        let payload = CreateDataviewPayload {
+            parent_view: dataview_view_name(&dv.parent_uuid),
+            view: dataview_view_name(&dv.uuid),
+            uuid: dv.uuid.clone(),
+            operation,
+            args: (*args).clone(),
+        };
+        let req = InvocationRequest {
+            function_name: "motoko-dataview".to_owned(),
+            invocation_type: get_invocation_type(),
+            payload: Some(as_bytes(&payload)?),
+            ..Default::default()
+        };
+        d.lambda.invoke(req).compat().await?;
+        Ok(dv)
     }
 
     pub async fn delete_dataview(
@@ -335,6 +350,9 @@ impl Mutation {
         if dv.uuid == dv.parent_uuid {
             return Err("cannot delete root dataview".into());
         }
+        Analysis::point_to(&d.db, &dv.analysis_uuid, &dv.parent_uuid)
+            .await
+            .map_err(|e| -> GQLError { e.into() })?;
         Dataview::delete(&d.db, &dataview_uuid)
             .await
             .map(|_| dataview_id)

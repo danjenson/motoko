@@ -125,8 +125,8 @@ impl Dataset {
     pub async fn schema(
         &self,
         ctx: &Context<'_>,
-    ) -> GQLResult<Vec<ColumnDataType>> {
-        let d = data(ctx)?;
+    ) -> Option<Vec<ColumnDataType>> {
+        let d = data(ctx).ok()?;
         let table_name = dataset_table_name(&self.uuid);
         query_as(
             r#"
@@ -138,14 +138,23 @@ impl Dataset {
         .bind(&table_name)
         .fetch_all(&d.db.data)
         .await
-        .map_err(|e| e.into())
+        .ok()
+    }
+
+    pub async fn n_rows(&self, ctx: &Context<'_>) -> Option<i64> {
+        let d = data(ctx).ok()?;
+        let table = dataset_table_name(&self.uuid);
+        query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {}", &table))
+            .fetch_one(&d.db.data)
+            .await
+            .ok()
     }
 
     pub async fn sample_rows(
         &self,
         ctx: &Context<'_>,
-    ) -> GQLResult<GQLJson<Json>> {
-        let d = data(ctx)?;
+    ) -> Option<GQLJson<Json>> {
+        let d = data(ctx).ok()?;
         let table_name = dataset_table_name(&self.uuid);
         query_scalar::<_, Json>(&format!(
             r#"
@@ -157,6 +166,6 @@ impl Dataset {
         .fetch_one(&d.db.data)
         .await
         .map(|v| GQLJson(v))
-        .map_err(|e| e.into())
+        .ok()
     }
 }

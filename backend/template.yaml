@@ -46,6 +46,14 @@ Resources:
       CodeUri: py/uri-to-sql-db
       Handler: app.lambda_handler
       Runtime: python3.8
+  MotokoDataview:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-dataview
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      CodeUri: py/dataview
+      Handler: app.lambda_handler
+      Runtime: python3.8
   MotokoStatistic:
     Type: AWS::Serverless::Function
     Properties:

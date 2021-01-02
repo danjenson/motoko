@@ -1,32 +1,28 @@
+import 'current.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_breadcrumb/flutter_breadcrumb.dart';
-import 'nav.dart';
+import 'package:provider/provider.dart';
 
-class NavBreadcrumb extends StatelessWidget {
-  NavBreadcrumb({@required this.nav});
-  final Nav nav;
+class ContentBreadcrumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final current = Provider.of<Current>(context);
     return BottomAppBar(
-        elevation: 5.0,
-        color: Theme.of(context).primaryColor,
         child: Padding(
             padding: EdgeInsets.all(12),
             child: BreadCrumb(
-                items: nav.names
+                items: current.names
                     .asMap()
                     .map((idx, name) => MapEntry(
                         idx,
                         BreadCrumbItem(
-                            onTap: () => nav.to(idx),
-                            content: Text(name,
+                            onTap: () => current.to(idx),
+                            content: Text(name.toLowerCase(),
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 25.0)))))
                     .values
                     .toList(),
                 overflow: ScrollableOverflow(reverse: true),
-                divider: Icon(Icons.keyboard_arrow_right,
-                    size: 35.0,
-                    color: Theme.of(context).colorScheme.secondary))));
+                divider: Icon(Icons.keyboard_arrow_right, size: 35.0))));
   }
 }

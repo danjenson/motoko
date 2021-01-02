@@ -160,6 +160,6 @@ def plot_smooth(
     se=True,
     **kwargs,
 ):
-    p = ggplot(df,
-               aes(**aesthetics(locals()))) + geom_point() + geom_smooth(se=se)
+    p = ggplot(df, aes(**aesthetics(locals()))) + geom_point() + geom_smooth(
+        se=se, method='glm')
     return add_shared(p, **kwargs)

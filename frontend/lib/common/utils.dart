@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 bool isPortrait(BuildContext context) {
   return MediaQuery.of(context).orientation == Orientation.portrait;
@@ -8,6 +9,10 @@ bool isPortrait(BuildContext context) {
 bool isCategoricalDataType(String name) {
   // https://www.postgresql.org/docs/9.5/datatype-character.html
   return name == 'text';
+}
+
+bool isNumeric(String text) {
+  return double.tryParse(text) != null;
 }
 
 bool isNumericDataType(String name) {
@@ -33,6 +38,10 @@ bool isWeb() {
 bool isDark(BuildContext context) {
   final Brightness brightnessValue = MediaQuery.of(context).platformBrightness;
   return brightnessValue == Brightness.dark;
+}
+
+String nCompact(int n) {
+  return NumberFormat.compact().format(n);
 }
 
 int timestamp() {

@@ -2,7 +2,8 @@ use crate::{
     gql::{current_user, data, graphql_id_to_uuid},
     id_to_node,
     models::{
-        Analysis, Dataset, Dataview, Model, Plot, Project, Statistic, User,
+        Analysis, Dataset, Dataview, Model, Plot, Project, ProjectUserRole,
+        Statistic, User,
     },
     Node,
 };
@@ -15,6 +16,14 @@ pub struct Query;
 impl Query {
     async fn me<'ctx>(&self, ctx: &'ctx Context<'_>) -> Result<&'ctx User> {
         current_user(ctx)
+    }
+
+    async fn users(&self, ctx: &Context<'_>) -> Result<Vec<User>> {
+        let d = data(ctx)?;
+        query_as("SELECT * FROM users")
+            .fetch_all(&d.db.meta)
+            .await
+            .map_err(|e| e.into())
     }
 
     async fn node(&self, ctx: &Context<'_>, id: ID) -> Result<Node> {
@@ -98,18 +107,16 @@ impl Query {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> Result<Vec<Dataset>> {
+    ) -> Result<Vec<ProjectUserRole>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
         query_as(
             r#"
-            SELECT pur.*
-            FROM project_user_roles pur
-            JOIN projects p
-            ON p.uuid = pur.project_uuid
-            WHERE pur.user_uuid = $1
-            AND p.uuid = $2
+            SELECT *
+            FROM project_user_roles
+            WHERE user_uuid = $1
+            AND project_uuid = $2
             "#,
         )
         .bind(&user.uuid)
@@ -148,7 +155,8 @@ impl Query {
                     SELECT dv2.*
                     FROM dataviews dv2
                     JOIN sub_dataviews sdv
-                    ON sdv.uuid = dv2.parent_uuid
+                    ON sdv.parent_uuid = dv2.uuid
+                    AND sdv.uuid != sdv.parent_uuid
                 )
                 SELECT *
                 FROM sub_dataviews

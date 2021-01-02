@@ -152,9 +152,9 @@ impl Dataview {
     pub async fn schema(
         &self,
         ctx: &Context<'_>,
-    ) -> GQLResult<Vec<ColumnDataType>> {
-        let d = data(ctx)?;
-        let table_name = dataview_view_name(&self.uuid);
+    ) -> Option<Vec<ColumnDataType>> {
+        let d = data(ctx).ok()?;
+        let view = dataview_view_name(&self.uuid);
         query_as(
             r#"
             SELECT column_name, data_type
@@ -162,17 +162,26 @@ impl Dataview {
             WHERE table_name = $1
             "#,
         )
-        .bind(&table_name)
+        .bind(&view)
         .fetch_all(&d.db.data)
         .await
-        .map_err(|e| e.into())
+        .ok()
+    }
+
+    pub async fn n_rows(&self, ctx: &Context<'_>) -> Option<i64> {
+        let d = data(ctx).ok()?;
+        let view = dataview_view_name(&self.uuid);
+        query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {}", &view))
+            .fetch_one(&d.db.data)
+            .await
+            .ok()
     }
 
     pub async fn sample_rows(
         &self,
         ctx: &Context<'_>,
-    ) -> GQLResult<GQLJson<Json>> {
-        let d = data(ctx)?;
+    ) -> Option<GQLJson<Json>> {
+        let d = data(ctx).ok()?;
         let view = dataview_view_name(&self.uuid);
         query_scalar::<_, Json>(&format!(
             r#"
@@ -184,6 +193,6 @@ impl Dataview {
         .fetch_one(&d.db.data)
         .await
         .map(|v| GQLJson(v))
-        .map_err(|e| e.into())
+        .ok()
     }
 }

@@ -45,7 +45,7 @@ class App extends StatelessWidget {
                     return accentColor;
                   }),
                 ],
-                child: GraphQL(
+                child: CustomGraphQLProvider(
                     Consumer<AccentColor>(builder: (context, accentColor, _) {
                   return MaterialApp(
                     title: 'motoko',
@@ -55,7 +55,7 @@ class App extends StatelessWidget {
                       '/privacy': (context) => PrivacyPage(),
                     },
                     themeMode: ThemeMode.dark,
-                    darkTheme: theme(accentColor.value),
+                    darkTheme: makeTheme(accentColor.value),
                   );
                 })));
           });

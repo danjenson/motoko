@@ -112,8 +112,9 @@ impl User {
         &self.name
     }
 
-    pub async fn email(&self) -> &str {
-        &self.email
+    pub async fn email(&self, ctx: &Context<'_>) -> GQLResult<&String> {
+        is_current_user(&self.uuid, ctx)?;
+        Ok(&self.email)
     }
 
     pub async fn refresh_tokens(

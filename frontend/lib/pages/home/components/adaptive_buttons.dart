@@ -1,16 +1,9 @@
+import '../../../common/utils.dart';
 import 'package:flutter/material.dart';
-import '../../common/utils.dart';
-
-class AdaptiveButtonData {
-  AdaptiveButtonData({@required this.icon, this.name, this.onTap});
-  final IconData icon;
-  final String name;
-  final void Function() onTap;
-}
 
 class AdaptiveButtons extends StatelessWidget {
-  AdaptiveButtons({@required this.buttonData});
-  final List<AdaptiveButtonData> buttonData;
+  AdaptiveButtons(this.adaptiveButtons);
+  final List<AdaptiveButtonData> adaptiveButtons;
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -19,20 +12,27 @@ class AdaptiveButtons extends StatelessWidget {
             direction: isPortrait(context) || isWeb()
                 ? Axis.vertical
                 : Axis.horizontal,
-            children: buttonData
-                .map((bd) => Expanded(
+            children: adaptiveButtons
+                .map((ab) => Expanded(
                         child: InkWell(
-                      onTap: bd.onTap,
+                      onTap: ab.onTap,
                       child: Card(
                           child: Center(
                               child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: <Widget>[
-                            Icon(bd.icon, size: 50.0),
+                            Icon(ab.icon, size: 50.0),
                             SizedBox(height: 5.0),
-                            Text(bd.name, style: TextStyle(fontSize: 20.0))
+                            Text(ab.name, style: TextStyle(fontSize: 20.0))
                           ]))),
                     )))
                 .toList()));
   }
+}
+
+class AdaptiveButtonData {
+  AdaptiveButtonData({@required this.icon, this.name, this.onTap});
+  final IconData icon;
+  final String name;
+  final void Function() onTap;
 }

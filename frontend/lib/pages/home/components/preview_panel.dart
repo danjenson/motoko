@@ -11,7 +11,7 @@ class PreviewPanel extends StatelessWidget {
     final color = Theme.of(context).colorScheme.secondary;
     return SlidingUpPanel(
         controller: controller,
-        margin: EdgeInsets.fromLTRB(15, 0, 15, 0),
+        margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
         minHeight: 35,
         backdropEnabled: true,
         color: Theme.of(context).cardColor,

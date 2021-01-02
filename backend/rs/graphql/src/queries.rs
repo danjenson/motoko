@@ -165,19 +165,6 @@ pub struct AnalysisResponse {
     pub dataview: DataviewResponse,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DataviewResponse {
-    #[serde(rename = "__typename")]
-    pub typename: String,
-    pub id: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub operation: Operation,
-    pub args: Option<Json>,
-    pub status: Status,
-}
-
 const ANALYSIS_FRAGMENT: &'static str = r#"
     __typename 
     id
@@ -236,6 +223,47 @@ pub fn rename_analysis(vars: &Vars) -> Request {
         "#,
             ANALYSIS_FRAGMENT,
         ),
+        vars,
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataviewResponse {
+    #[serde(rename = "__typename")]
+    pub typename: String,
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub operation: Operation,
+    pub args: Option<Json>,
+    pub status: Status,
+}
+
+pub fn create_dataview(vars: &Vars) -> Request {
+    make_request(
+        r#"
+        mutation CreateDataview(
+            $analysisId: ID!,
+            $operation: Operation!,
+            $args: JSON!,
+        ) {
+            createDataview(
+                analysisId: $analysisId,
+                operation: $operation,
+                args: $args,
+            ) {
+                __typename
+                id
+                createdAt
+                updatedAt
+                operation
+                args
+                status
+            }
+        }
+        "#
+        .to_owned(),
         vars,
     )
 }

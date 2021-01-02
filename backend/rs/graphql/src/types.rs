@@ -1,4 +1,4 @@
-use crate::models::{PlotType, StatisticType};
+use crate::models::{Operation, PlotType, StatisticType};
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -23,6 +23,15 @@ pub struct ModelKeys {
 pub struct UploadDatasetPayload {
     pub uri: String,
     pub uuid: Uuid,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateDataviewPayload {
+    pub parent_view: String,
+    pub view: String,
+    pub uuid: Uuid,
+    pub operation: Operation,
+    pub args: Json,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -21,7 +21,7 @@ DECLARE
     AND table_schema = 'public';
 BEGIN
     FOR stmt IN statements LOOP
-        EXECUTE 'DROP TABLE ' || quote_ident(stmt.table_name) || ' CASCADE';
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(stmt.table_name) || ' CASCADE';
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
@@ -35,7 +35,7 @@ DECLARE
     AND table_schema = 'public';
 BEGIN
     FOR stmt IN statements LOOP
-        EXECUTE 'DROP VIEW ' || quote_ident(stmt.table_name) || ' CASCADE';
+        EXECUTE 'DROP VIEW IF EXISTS ' || quote_ident(stmt.table_name) || ' CASCADE';
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;

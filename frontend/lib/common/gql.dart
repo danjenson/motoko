@@ -4,8 +4,8 @@ import '../common/auth.dart';
 import '../common/tier.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
-class GraphQL extends StatelessWidget {
-  GraphQL(this.child);
+class CustomGraphQLProvider extends StatelessWidget {
+  CustomGraphQLProvider(this.child);
   final Widget child;
   @override
   Widget build(BuildContext context) {
@@ -13,7 +13,7 @@ class GraphQL extends StatelessWidget {
     var authLink = AuthLink(getToken: () async {
       if (auth.refreshTokenHasExpired()) {
         await auth.logout();
-        return "";
+        return '';
       }
       if (auth.accessTokenHasExpired()) {
         await auth.refreshTokens(context);

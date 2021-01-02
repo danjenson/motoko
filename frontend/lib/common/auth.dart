@@ -3,7 +3,7 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'storage.dart';
 import 'tier.dart';
-import 'error_dialog.dart';
+import 'dialogs.dart';
 import 'utils.dart';
 import 'package:flutter/foundation.dart';
 
@@ -79,19 +79,19 @@ class Auth extends ChangeNotifier {
   }
 
   refreshTokens(BuildContext context) async {
-    final queryOpts = QueryOptions(
+    final mutationOpts = QueryOptions(
         fetchPolicy: FetchPolicy.networkOnly,
         documentNode: gql(_refresh),
         variables: {'token': _refreshToken});
     try {
-      final res = await client().query(queryOpts);
+      final res = await client().query(mutationOpts);
       final creds = res.data['refresh'];
       _accessToken = creds['accessToken'];
       _accessTokenExpiresAt = creds['accessTokenExpiresAt'];
       _refreshToken = creds['refreshToken'];
       _refreshTokenExpiresAt = creds['refreshToken'];
     } catch (e) {
-      errorDialog(context: context, message: e.toString());
+      showErrorDialog(context, e.toString());
       _status = Status.Unauthenticated;
       notifyListeners();
     }
@@ -118,11 +118,11 @@ class Auth extends ChangeNotifier {
       final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-      final queryOpts = QueryOptions(
+      final mutationOpts = MutationOptions(
           fetchPolicy: FetchPolicy.networkOnly,
           documentNode: gql(_login),
           variables: {'provider': 'GOOGLE', 'token': googleAuth.idToken});
-      final res = await client().query(queryOpts);
+      final res = await client().mutate(mutationOpts);
       if (!res.loading) {
         debugPrint(res.exception.toString());
         final creds = res.data['login'];
@@ -146,7 +146,7 @@ class Auth extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      errorDialog(context: context, message: e.toString());
+      showErrorDialog(context, e.toString());
       _status = Status.Unauthenticated;
       notifyListeners();
     }

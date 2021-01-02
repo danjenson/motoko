@@ -1,5 +1,5 @@
-import '../../common/accent_color.dart';
-import '../../common/auth.dart';
+import '../../../common/accent_color.dart';
+import '../../../common/auth.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,8 +7,8 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:provider/provider.dart';
 
 class ProfileDrawer extends StatelessWidget {
-  final double size = 25.0;
-  final TextStyle textStyle = TextStyle(fontSize: 25.0);
+  final double size = 20.0;
+  final TextStyle textStyle = TextStyle(fontSize: 20.0);
   final query = '''
     query {
       me {
@@ -25,7 +25,7 @@ class ProfileDrawer extends StatelessWidget {
     var auth = Provider.of<Auth>(context, listen: false);
     return Query(
         options: QueryOptions(
-          fetchPolicy: FetchPolicy.cacheAndNetwork,
+          fetchPolicy: FetchPolicy.cacheFirst,
           documentNode: gql(query),
         ),
         builder: (QueryResult result,
@@ -40,15 +40,23 @@ class ProfileDrawer extends StatelessWidget {
                       alignment: Alignment.center,
                       transform: Matrix4.rotationY(math.pi),
                       child: Icon(Icons.sports_motorsports_sharp,
-                          size: 100.0,
+                          size: 75.0,
                           color: Theme.of(context).colorScheme.secondary)),
-                  SizedBox(height: 10.0),
+                  SizedBox(height: 5.0),
                   Text(
                       result.data != null && result.data['me'] != null
-                          ? result.data['me']['name']
+                          ? result.data['me']['displayName']
                           : "",
                       style: TextStyle(
                           fontSize: 20.0,
+                          color: Theme.of(context).colorScheme.secondary)),
+                  SizedBox(height: 5.0),
+                  Text(
+                      result.data != null && result.data['me'] != null
+                          ? '@' + result.data['me']['name']
+                          : "",
+                      style: TextStyle(
+                          fontSize: 15.0,
                           color: Theme.of(context).colorScheme.secondary)),
                 ]))),
                 Spacer(),
@@ -81,7 +89,7 @@ class ProfileDrawer extends StatelessWidget {
                       child: Icon(Icons.exit_to_app, size: size),
                     ),
                     title: Text('Logout', style: textStyle)),
-                SizedBox(height: 10.0),
+                SizedBox(height: 20.0),
               ],
             ),
           );

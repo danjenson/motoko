@@ -3,36 +3,49 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- remove dropdownmenu flutter dependency - 25
-- calculate statistic
-  - backend - 25
-  - frontend - 25
-- transform data (select, filter, summarize)
-  - backend - 26
-  - frontend - 26
-- model
-  - backend - 27, 28
-  - frontend - 29, 30
-- add users to project - 31
-- custom plot theme - 31
-- allow cloning projects
-- custom errors from lambda or API gateway if it doesn't even load
-- separate error messages for dev vs prod:
-  - https://doc.rust-lang.org/reference/conditional-compilation.html
-  - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
-- create test databases for cloudbuild unittests
-- fix sliding up panel: https://github.com/akshathjain/sliding_up_panel/issues/193
-- async SAM invoke: https://github.com/aws/aws-sam-cli/pull/749
-- SAM invoke rust: https://github.com/aws/aws-lambda-runtime-interface-emulator/issues/11
-- Tokio-3 AWS Lambda - remove all .compat()
-- dev tier adds to event object, enabling features
-- Dropdown menu borders
-- setup [RDS Proxy](https://aws.amazon.com/blogs/compute/using-amazon-rds-proxy-with-aws-lambda/)
-  to manage connection pooling for lambdas
-- google auth submit for review
-- get rights to Motoko font for mobile apps too
-- motoko pypi sdk
-- [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
+- dataview:
+  - dataview (filter, sort, summarize)
+- model:
+  - backend - 30
+  - frontend - 31
+- feedback from drawer
+  - bug reports
+  - feature requests
+- iOS deployment
+- plotting:
+  - custom theme
+  - log transforms
+- UI:
+  - renaming - create `rename_node` mutation
+  - dropdown menu borders
+- copy references from parents if possible:
+  - reverse dependency -> dataviews point to assets, add gc cleanup of assets
+    - search in parents? can get complex
+    - copy to children? what happens if middle child creates a new asset?
+  - plots
+  - statistics
+  - models
+- errors:
+  - custom errors from lambda or API gateway if it doesn't even load
+  - separate error messages for dev vs prod:
+    - https://doc.rust-lang.org/reference/conditional-compilation.html
+    - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
+- dev ops:
+  - setup iOS deployment - test flight
+  - create test databases for cloudbuild unittests
+  - dev tier adds to event object, enabling features
+  - setup [RDS Proxy](https://aws.amazon.com/blogs/compute/using-amazon-rds-proxy-with-aws-lambda/)
+  - get rights to Motoko font for mobile apps too
+- auth:
+  - google auth submit for review
+  - add apple login
+- bugs:
+  - fix sliding up panel: https://github.com/akshathjain/sliding_up_panel/issues/193
+    - fix hack for preview, adding 140 bottom pixels
+  - async SAM invoke: https://github.com/aws/aws-sam-cli/pull/749
+  - SAM invoke rust: https://github.com/aws/aws-lambda-runtime-interface-emulator/issues/11
+  - Tokio-3 AWS Lambda - remove all .compat()
+  - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
 ## Product
 - Marketplace for canned analyses?
@@ -86,7 +99,6 @@
   - `GRANT ALL PRIVILEGES ON DATABASE motoko_data TO motoko;`
   - `CREATE EXTENSION IF NOT EXISTS tsm_system_rows;`
   - `motoko run reset-databases`
-- setup backend dotenv: `motoko run setup-backend-dotenv`
 - run AWS SAM from `motoko/backend`:
   - `sam local start-lambda`
     - if you get `[Errno 28] No space left on device`, you need to increase
@@ -129,39 +141,6 @@
 #### Creating a Migration
 - `sqlx migrate add <name> # fill out in migrations/<name>.sql`
 - `cargo sqlx prepare -- --lib # recompile static type checking`
-
-#### Mappings
-- postgres types are mapped to internal diesel types, which are, in turn,
-  mapped to native rust types:
-    - running `diesel migration run` outputs `src/schema.rs`, which represents
-      a generated mapping between postgres types and internal diesel types
-    - the `diesel-derive-enum` crate creates internal diesel enums for postgres
-      enums, since they are not supported natively by diesel cli:
-      - rust enums, i.e. MyEnum::MyVariant, are assumed to be `my_enum` and
-        `my_variant` in postgres
-      - using the `#[PgType = "MY_ENUM"]` on a rust enum will map it to
-        `MY_ENUM` inside postgres, instead of `my_enum`
-      - using the `#[DieselType = "My_enum"]` on a rust enum will map it to the
-        diesel type `My_enum`, which is often necessary, since diesel cli using
-        `print_schema` (specified in
-        [diesel.toml](https://github.com/danjenson/motoko/blob/prod/backend/rs/gql/diesel.toml))
-        assumes that a postgres enum like `MY_ENUM` or `my_enum` will be mapped
-        to title-case, i.e. `My_enum`, which is not the default
-        created by this crate (by default it would create `MyEnumMapping`)
-      - more details about renaming can be found
-        [here](https://github.com/adwhit/diesel-derive-enum)
-      - using `import_types` 
-        [diesel.toml](https://github.com/danjenson/motoko/blob/prod/backend/rs/gql/diesel.toml)
-        allows importing special mappings, like 
-        [enums](https://github.com/danjenson/motoko/blob/prod/backend/rs/gql/src/enums.rs)
-        that are used in the `src/schema.rs`
-      - using `patch_file` in 
-        [diesel.toml](https://github.com/danjenson/motoko/blob/prod/backend/rs/gql/diesel.toml)
-        allows adding a patch to the `src/schema.rs` after generation; to make
-        one, commit `src/schema.rs`, then make a change, then run
-        `git diff -U6 > src/schema.patch` and delete the first two lines; this
-        will make whatever changes you just made to the `src/schema.rs` after
-        every auto-generation
 
 ## Deployment
 - automatic deployment for the `dev` and `prod` branches is setup for every

@@ -212,6 +212,158 @@ mod tests {
             return Err(GQLError::new("failed to rename analysis"));
         }
 
+        eprintln!("create dataview - select");
+        res = respond(
+            create_dataview(&[
+                ("analysisId", &analysis.id.clone()),
+                ("operation", "SELECT"),
+                (
+                    "args",
+                    r#"
+                    {"columns": [
+                        "sepal_width",
+                        "sepal_length",
+                        "petal_width",
+                        "species"
+                    ]}"#,
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        let mut dv = from_response::<DataviewResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        let mut s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create dataview - select"));
+        }
+
+        eprintln!("create dataview - filter");
+        res = respond(
+            create_dataview(&[
+                ("analysisId", &analysis.id.clone()),
+                ("operation", "FILTER"),
+                (
+                    "args",
+                    r#"
+                    {"filters": [
+                       {
+                            "column": "sepal_length",
+                            "comparator": ">",
+                            "value": "1"
+                       },
+                       {
+                            "column": "petal_width",
+                            "comparator": "<=",
+                            "value": "5"
+                       },
+                       {
+                            "column": "species",
+                            "comparator": "=",
+                            "value": "versicolor"
+                       }
+                    ]}"#,
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        dv = from_response::<DataviewResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create dataview - filter"));
+        }
+
+        eprintln!("create dataview - sort");
+        res = respond(
+            create_dataview(&[
+                ("analysisId", &analysis.id.clone()),
+                ("operation", "SORT"),
+                (
+                    "args",
+                    r#"
+                    {"sorts": [
+                       {
+                            "column": "sepal_length",
+                            "order": "ASCENDING"
+                       },
+                       {
+                            "column": "petal_width",
+                            "order": "DESCENDING"
+                       },
+                       {
+                            "column": "species",
+                            "order": "ASCENDING"
+                       }
+                    ]}"#,
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        dv = from_response::<DataviewResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create dataview - sort"));
+        }
+
+        eprintln!("create dataview - summarize");
+        res = respond(
+            create_dataview(&[
+                ("analysisId", &analysis.id.clone()),
+                ("operation", "SUMMARIZE"),
+                (
+                    "args",
+                    r#"
+                    {
+                        "summaries": [
+                           {
+                                "column": "sepal_length",
+                                "summarizer": "MEAN"
+                           },
+                           {
+                                "column": "sepal_length",
+                                "summarizer": "MIN"
+                           },
+                           {
+                                "column": "sepal_length",
+                                "summarizer": "MAX"
+                           },
+                           {
+                                "column": "sepal_length",
+                                "summarizer": "STDDEV"
+                           },
+                           {
+                                "column": "petal_width",
+                                "summarizer": "MEDIAN"
+                           },
+                           {
+                                "column": "species",
+                                "summarizer": "MODE"
+                           }
+                        ],
+                        "groupBys": [
+                            "sepal_length"
+                        ]
+                    }"#,
+                ),
+            ]),
+            &ctx,
+        )
+        .await;
+        dv = from_response::<DataviewResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create dataview - summarize"));
+        }
+
         eprintln!("create bar plot");
         res = respond(
             create_plot(&[
@@ -233,7 +385,7 @@ mod tests {
         let mut plot = from_response::<PlotResponse>(res)?;
         thread::sleep(time::Duration::from_secs(2));
         res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
-        let mut s = from_response::<StatusResponse>(res)?;
+        s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new("failed to create bar plot"));
         }
@@ -436,8 +588,8 @@ mod tests {
 
     async fn reset_databases(ctx: &ContextData) -> SQLxResult<()> {
         truncate_tables(&ctx.db.meta).await?;
-        drop_views(&ctx.db.data).await?;
         drop_tables(&ctx.db.data).await?;
+        drop_views(&ctx.db.data).await?;
         Ok(())
     }
 
