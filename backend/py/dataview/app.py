@@ -1,16 +1,14 @@
-from os import environ as env
-from uuid import UUID
 import json
 
 from psycopg2 import sql
-import boto3
-import psycopg2
+
+import utils as u
 
 
 def lambda_handler(event, context):
-    validate(event)
+    u.validate(event, ['parent_view', 'view', 'uuid', 'operation', 'args'])
     dataview_uuid = event['uuid']
-    data_db, meta_db = dbs()
+    data_db, meta_db = u.dbs()
     data_cur, meta_cur = data_db.cursor(), meta_db.cursor()
 
     def update_status(status):
@@ -41,34 +39,6 @@ def lambda_handler(event, context):
         meta_db.close()
         data_db.close()
     return {'statusCode': 200, 'body': res}
-
-
-def dbs():
-    docker_db_url = 'postgres://postgres@172.17.0.1:5432/motoko'
-    data_db_url = docker_db_url + '_data'
-    meta_db_url = docker_db_url + '_meta'
-    if run_mode() != 'local':
-        s = boto3.session.Session()
-        sm = s.client(service_name='secretsmanager', region_name='us-west-1')
-        secrets = json.loads(
-            sm.get_secret_value(SecretId='motoko')['SecretString'])
-        data_db_url = secrets['data_db_url']
-        meta_db_url = secrets['meta_db_url']
-    data_db = psycopg2.connect(data_db_url)
-    meta_db = psycopg2.connect(meta_db_url)
-    return data_db, meta_db
-
-
-def run_mode():
-    return env.get('RUN_MODE', 'local')
-
-
-def validate(event):
-    required = ['parent_view', 'view', 'uuid', 'operation', 'args']
-    for req in required:
-        if req not in event:
-            raise InvalidArguments(f'no {req}')
-    event['uuid'] = UUID(event['uuid'])
 
 
 def dataview(operation, db, parent_view, view, args):
@@ -189,10 +159,6 @@ def dataview_summarize(
             *group_bys,
         )
     db.execute(q)
-
-
-class InvalidArguments(Exception):
-    pass
 
 
 class InvalidComparator(Exception):

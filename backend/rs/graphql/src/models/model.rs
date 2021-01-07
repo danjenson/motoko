@@ -20,8 +20,10 @@ pub struct Model {
     pub name: String,
     pub target: Option<String>,
     pub features: Vec<String>,
-    pub args: Json,
+    pub args: Option<Json>,
     pub status: Status,
+    pub evaluation: Option<Json>,
+    pub decisions: Option<Json>,
 }
 
 impl Model {
@@ -31,7 +33,7 @@ impl Model {
         name: &str,
         target: &Option<String>,
         features: &Vec<String>,
-        args: &Json,
+        args: &Option<Json>,
     ) -> SQLxResult<Self> {
         query_as(
             r#"
@@ -138,11 +140,19 @@ impl Model {
         &self.features
     }
 
-    pub async fn args(&self) -> GQLJson<Json> {
-        GQLJson(self.args.to_owned())
+    pub async fn args(&self) -> Option<GQLJson<Json>> {
+        self.args.to_owned().map(|v| GQLJson(v))
     }
 
     pub async fn status(&self) -> &Status {
         &self.status
+    }
+
+    pub async fn evaluation(&self) -> Option<GQLJson<Json>> {
+        self.evaluation.to_owned().map(|v| GQLJson(v))
+    }
+
+    pub async fn decisions(&self) -> Option<GQLJson<Json>> {
+        self.decisions.to_owned().map(|v| GQLJson(v))
     }
 }

@@ -3,15 +3,16 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- dataview:
-  - dataview (filter, sort, summarize)
 - model:
-  - backend - 30
-  - frontend - 31
+  - backend
+  - frontend
 - feedback from drawer
   - bug reports
   - feature requests
 - iOS deployment
+  - developer account
+  - apple login
+  - test flight
 - plotting:
   - custom theme
   - log transforms
@@ -170,6 +171,8 @@
         password to unlock the keystore (also from AWS Secrets Manager) and is
         used when building by gradle; do not add either of these files to the
         code repo
+  - make sure that before installing the version with the new keystore, you
+    have uninstalled the old version
   - to reset the keystore in AWS Secrets Manager, run `motoko run
     reset-android-keystores`, which does the following:
       - generates a new keystore and uploads it to AWS Secrets Manager with the

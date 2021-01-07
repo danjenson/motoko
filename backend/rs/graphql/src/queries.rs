@@ -1,14 +1,13 @@
 use crate::{
     models::{Operation, PlotType, StatisticType, Status},
-    utils::vars_to_variables,
     ColumnDataType, Json, Vars,
 };
-use async_graphql::Request;
+use async_graphql::{Request, Variables};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 fn make_request(query: String, vars: &Vars) -> Request {
-    Request::new(query).variables(vars_to_variables(vars))
+    Request::new(query).variables(Variables::from_value(vars.to_owned()))
 }
 
 #[derive(Deserialize)]
@@ -270,6 +269,56 @@ pub fn create_dataview(vars: &Vars) -> Request {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StatisticResponse {
+    #[serde(rename = "__typename")]
+    pub typename: String,
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    #[serde(rename = "type")]
+    pub type_: StatisticType,
+    pub args: Json,
+    pub status: Status,
+    pub value: Option<Json>,
+}
+
+const STATISTIC_FRAGMENT: &'static str = r#"
+    __typename 
+    id
+    createdAt
+    updatedAt
+    type
+    args
+    status
+    value
+"#;
+
+pub fn create_statistic(vars: &Vars) -> Request {
+    make_request(
+        format!(
+            r#"
+        mutation CreateStatistic(
+            $dataviewId: ID!,
+            $type: StatisticType!,
+            $args: JSON!,
+        ) {{
+            createStatistic(
+                dataviewId: $dataviewId,
+                type: $type,
+                args: $args,
+            ) {{
+                {}
+            }}
+        }}
+        "#,
+            STATISTIC_FRAGMENT,
+        ),
+        vars,
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlotResponse {
     #[serde(rename = "__typename")]
     pub typename: String,
@@ -338,6 +387,81 @@ pub fn rename_plot(vars: &Vars) -> Request {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ModelResponse {
+    #[serde(rename = "__typename")]
+    pub typename: String,
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub name: String,
+    pub target: Option<String>,
+    pub features: Vec<String>,
+    pub args: Option<Json>,
+    pub status: Status,
+    pub decisions: Option<Json>,
+    pub evalution: Option<Json>,
+}
+
+const MODEL_FRAGMENT: &'static str = r#"
+    __typename 
+    id
+    createdAt
+    updatedAt
+    name
+    target
+    features
+    args
+    status
+    decisions
+    evaluation
+"#;
+
+pub fn create_model(vars: &Vars) -> Request {
+    make_request(
+        format!(
+            r#"
+        mutation CreateModel(
+            $dataviewId: ID!,
+            $name: String!,
+            $target: String,
+            $features: [String!]!,
+            $args: JSON,
+        ) {{
+            createModel(
+                dataviewId: $dataviewId,
+                name: $name,
+                target: $target,
+                features: $features,
+                args: $args,
+            ) {{
+                {}
+            }}
+        }}
+        "#,
+            MODEL_FRAGMENT,
+        ),
+        vars,
+    )
+}
+
+pub fn rename_model(vars: &Vars) -> Request {
+    make_request(
+        format!(
+            r#"
+        mutation RenameModel($modelId: ID!, $name: String!) {{
+            renameModel(modelId: $modelId, name: $name) {{
+                {}
+            }}
+        }}
+        "#,
+            MODEL_FRAGMENT,
+        ),
+        vars,
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StatusResponse {
     #[serde(rename = "__typename")]
     pub typename: String,
@@ -368,56 +492,6 @@ pub fn status(vars: &Vars) -> Request {
         }
         "#
         .to_owned(),
-        vars,
-    )
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StatisticResponse {
-    #[serde(rename = "__typename")]
-    pub typename: String,
-    pub id: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    #[serde(rename = "type")]
-    pub type_: StatisticType,
-    pub args: Json,
-    pub status: Status,
-    pub value: Option<Json>,
-}
-
-const STATISTIC_FRAGMENT: &'static str = r#"
-    __typename 
-    id
-    createdAt
-    updatedAt
-    type
-    args
-    status
-    value
-"#;
-
-pub fn create_statistic(vars: &Vars) -> Request {
-    make_request(
-        format!(
-            r#"
-        mutation CreateStatistic(
-            $dataviewId: ID!,
-            $type: StatisticType!,
-            $args: JSON!,
-        ) {{
-            createStatistic(
-                dataviewId: $dataviewId,
-                type: $type,
-                args: $args,
-            ) {{
-                {}
-            }}
-        }}
-        "#,
-            STATISTIC_FRAGMENT,
-        ),
         vars,
     )
 }

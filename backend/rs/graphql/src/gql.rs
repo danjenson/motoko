@@ -32,6 +32,7 @@ pub fn from_response<T: DeserializeOwned>(res: GQLResponse) -> GQLResult<T> {
             .ok_or::<GQLError>(Error::Serde.into())?;
         return from_value::<T>(first).map_err(|e| e.into());
     }
+    eprintln!("{:?}", res);
     Err(Error::Serde.into())
 }
 
@@ -92,10 +93,9 @@ mod tests {
     use crate::{
         models::{Status, User},
         queries::*,
-        utils::vars_to_json_string,
         GenericError,
     };
-    use async_graphql::Result as GQLResult;
+    use async_graphql::{value as v, Result as GQLResult};
     use rusoto_core::Region;
     use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
     use sqlx::{query, Result as SQLxResult};
@@ -134,12 +134,12 @@ mod tests {
 
         eprintln!("create project");
         let mut res =
-            respond(create_project(&[("name", "Test Project")]), &ctx).await;
+            respond(create_project(&v!({"name": "Test Project"})), &ctx).await;
         let mut project: ProjectResponse = from_response(res)?;
 
         // make project public
         res = respond(
-            make_project_public(&[("projectId", &project.id.clone())]),
+            make_project_public(&v!({"projectId": &project.id.clone()})),
             &ctx,
         )
         .await;
@@ -151,10 +151,10 @@ mod tests {
         eprintln!("rename project");
         let new_project_name = "Test Project Renamed";
         res = respond(
-            rename_project(&[
-                ("projectId", &project.id.clone()),
-                ("name", new_project_name),
-            ]),
+            rename_project(&v!({
+                "projectId": &project.id.clone(),
+                "name": new_project_name,
+            })),
             &ctx,
         )
         .await;
@@ -164,20 +164,20 @@ mod tests {
         }
 
         eprintln!("create dataset");
-        res = respond(create_dataset(&[
-            ("projectId", &project.id.clone()),
-            ("name", "iris"),
-            ("uri", "https://drive.google.com/file/d/12q0KWJAUaVba9RZrVY8QEXThK1x5GoF8/view?usp=sharing")
-        ]), &ctx).await;
+        res = respond(create_dataset(&v!({
+            "projectId": &project.id.clone(),
+            "name": "iris",
+            "uri": "https://drive.google.com/file/d/12q0KWJAUaVba9RZrVY8QEXThK1x5GoF8/view?usp=sharing",
+        })), &ctx).await;
         let mut dataset: DatasetResponse = from_response(res)?;
 
         eprintln!("rename dataset");
         let new_dataset_name = "iris renamed";
         res = respond(
-            rename_dataset(&[
-                ("datasetId", &dataset.id.clone()),
-                ("name", new_dataset_name),
-            ]),
+            rename_dataset(&v!({
+                "datasetId": &dataset.id.clone(),
+                "name": new_dataset_name,
+            })),
             &ctx,
         )
         .await;
@@ -188,10 +188,10 @@ mod tests {
 
         eprintln!("create analysis");
         res = respond(
-            create_analysis(&[
-                ("datasetId", &dataset.id.clone()),
-                ("name", "test analysis"),
-            ]),
+            create_analysis(&v!({
+                "datasetId": &dataset.id.clone(),
+                "name": "test analysis",
+            })),
             &ctx,
         )
         .await;
@@ -200,10 +200,10 @@ mod tests {
         eprintln!("rename analysis");
         let new_analysis_name = "test analysis renamed";
         res = respond(
-            rename_analysis(&[
-                ("analysisId", &analysis.id.clone()),
-                ("name", new_analysis_name),
-            ]),
+            rename_analysis(&v!({
+                "analysisId": &analysis.id.clone(),
+                "name": new_analysis_name,
+            })),
             &ctx,
         )
         .await;
@@ -214,64 +214,58 @@ mod tests {
 
         eprintln!("create dataview - select");
         res = respond(
-            create_dataview(&[
-                ("analysisId", &analysis.id.clone()),
-                ("operation", "SELECT"),
-                (
-                    "args",
-                    r#"
-                    {"columns": [
-                        "sepal_width",
-                        "sepal_length",
-                        "petal_width",
-                        "species"
-                    ]}"#,
-                ),
-            ]),
+            create_dataview(&v!({
+                "analysisId": &analysis.id.clone(),
+                "operation": "SELECT",
+                "args":
+                r#"{"columns": [
+                    "sepal_width",
+                    "sepal_length",
+                    "petal_width",
+                    "species"
+                ]}"#,
+            })),
             &ctx,
         )
         .await;
         let mut dv = from_response::<DataviewResponse>(res)?;
         thread::sleep(time::Duration::from_secs(1));
-        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        res = respond(status(&v!({"id": &dv.id.clone()})), &ctx).await;
         let mut s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new("failed to create dataview - select"));
         }
-
         eprintln!("create dataview - filter");
         res = respond(
-            create_dataview(&[
-                ("analysisId", &analysis.id.clone()),
-                ("operation", "FILTER"),
-                (
-                    "args",
-                    r#"
-                    {"filters": [
-                       {
+            create_dataview(&v!({
+                "analysisId": &analysis.id.clone(),
+                "operation": "FILTER",
+                "args": r#"{
+                    "filters": [
+                        {
                             "column": "sepal_length",
                             "comparator": ">",
                             "value": "1"
-                       },
-                       {
+                        },
+                        {
                             "column": "petal_width",
                             "comparator": "<=",
                             "value": "5"
-                       },
-                       {
+                        },
+                        {
                             "column": "species",
                             "comparator": "=",
                             "value": "versicolor"
-                       }
-                    ]}"#,
-                ),
-            ]),
+                        }
+                    ]
+                }"#,
+            })),
             &ctx,
         )
         .await;
         dv = from_response::<DataviewResponse>(res)?;
         thread::sleep(time::Duration::from_secs(1));
-        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        res = respond(status(&v!({"id": &dv.id.clone()})), &ctx).await;
         s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new("failed to create dataview - filter"));
@@ -279,34 +273,32 @@ mod tests {
 
         eprintln!("create dataview - sort");
         res = respond(
-            create_dataview(&[
-                ("analysisId", &analysis.id.clone()),
-                ("operation", "SORT"),
-                (
-                    "args",
-                    r#"
-                    {"sorts": [
-                       {
+            create_dataview(&v!({
+                "analysisId": &analysis.id.clone(),
+                "operation": "SORT",
+                "args": r#"{
+                    "sorts": [
+                        {
                             "column": "sepal_length",
                             "order": "ASCENDING"
-                       },
-                       {
+                        },
+                        {
                             "column": "petal_width",
                             "order": "DESCENDING"
-                       },
-                       {
+                        },
+                        {
                             "column": "species",
                             "order": "ASCENDING"
-                       }
-                    ]}"#,
-                ),
-            ]),
+                        }
+                    ]
+                }"#,
+            })),
             &ctx,
         )
         .await;
         dv = from_response::<DataviewResponse>(res)?;
         thread::sleep(time::Duration::from_secs(1));
-        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        res = respond(status(&v!({"id": &dv.id.clone()})), &ctx).await;
         s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new("failed to create dataview - sort"));
@@ -314,219 +306,65 @@ mod tests {
 
         eprintln!("create dataview - summarize");
         res = respond(
-            create_dataview(&[
-                ("analysisId", &analysis.id.clone()),
-                ("operation", "SUMMARIZE"),
-                (
-                    "args",
-                    r#"
-                    {
-                        "summaries": [
-                           {
-                                "column": "sepal_length",
-                                "summarizer": "MEAN"
-                           },
-                           {
-                                "column": "sepal_length",
-                                "summarizer": "MIN"
-                           },
-                           {
-                                "column": "sepal_length",
-                                "summarizer": "MAX"
-                           },
-                           {
-                                "column": "sepal_length",
-                                "summarizer": "STDDEV"
-                           },
-                           {
-                                "column": "petal_width",
-                                "summarizer": "MEDIAN"
-                           },
-                           {
-                                "column": "species",
-                                "summarizer": "MODE"
-                           }
-                        ],
-                        "groupBys": [
-                            "sepal_length"
-                        ]
-                    }"#,
-                ),
-            ]),
+            create_dataview(&v!({
+                "analysisId": &analysis.id.clone(),
+                "operation": "SUMMARIZE",
+                "args": r#"{
+                    "summaries": [
+                        {
+                            "column": "sepal_length",
+                            "summarizer": "MEAN"
+                        },
+                        {
+                            "column": "sepal_length",
+                            "summarizer": "MIN"
+                        },
+                        {
+                            "column": "sepal_length",
+                            "summarizer": "MAX"
+                        },
+                        {
+                            "column": "sepal_length",
+                            "summarizer": "STDDEV"
+                        },
+                        {
+                            "column": "petal_width",
+                            "summarizer": "MEDIAN"
+                        },
+                        {
+                            "column": "species",
+                            "summarizer": "MODE"
+                        }
+                    ],
+                    "groupBys": [
+                        "sepal_length"
+                    ]
+                }"#,
+            })),
             &ctx,
         )
         .await;
         dv = from_response::<DataviewResponse>(res)?;
         thread::sleep(time::Duration::from_secs(1));
-        res = respond(status(&[("id", &dv.id.clone())]), &ctx).await;
+        res = respond(status(&v!({"id": &dv.id.clone()})), &ctx).await;
         s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new("failed to create dataview - summarize"));
         }
 
-        eprintln!("create bar plot");
-        res = respond(
-            create_plot(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("name", "bar"),
-                ("type", "BAR"),
-                (
-                    "args",
-                    &vars_to_json_string(&[
-                        ("x", "species"),
-                        ("color", "species"),
-                        ("title", "Species"),
-                    ]),
-                ),
-            ]),
-            &ctx,
-        )
-        .await;
-        let mut plot = from_response::<PlotResponse>(res)?;
-        thread::sleep(time::Duration::from_secs(2));
-        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
-        s = from_response::<StatusResponse>(res)?;
-        if s.status != Status::Completed {
-            return Err(GQLError::new("failed to create bar plot"));
-        }
-
-        eprintln!("create histogram plot");
-        res = respond(
-            create_plot(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("name", "histogram"),
-                ("type", "HISTOGRAM"),
-                ("args", &vars_to_json_string(&[("x", "sepal_width")])),
-            ]),
-            &ctx,
-        )
-        .await;
-        plot = from_response::<PlotResponse>(res)?;
-        thread::sleep(time::Duration::from_secs(2));
-        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
-        s = from_response::<StatusResponse>(res)?;
-        if s.status != Status::Completed {
-            return Err(GQLError::new("failed to create histogram plot"));
-        }
-
-        eprintln!("create line plot");
-        res = respond(
-            create_plot(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("name", "histogram"),
-                ("type", "LINE"),
-                (
-                    "args",
-                    &vars_to_json_string(&[
-                        ("x", "sepal_width"),
-                        ("y", "petal_width"),
-                        ("title", "Sepal vs. Petal Width"),
-                        ("color", "species"),
-                    ]),
-                ),
-            ]),
-            &ctx,
-        )
-        .await;
-        plot = from_response::<PlotResponse>(res)?;
-        thread::sleep(time::Duration::from_secs(2));
-        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
-        s = from_response::<StatusResponse>(res)?;
-        if s.status != Status::Completed {
-            return Err(GQLError::new("failed to create line plot"));
-        }
-
-        eprintln!("create scatter plot");
-        res = respond(
-            create_plot(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("name", "scatter"),
-                ("type", "SCATTER"),
-                (
-                    "args",
-                    &vars_to_json_string(&[
-                        ("x", "sepal_width"),
-                        ("y", "petal_width"),
-                        ("title", "Sepal vs. Petal Width"),
-                        ("color", "species"),
-                        ("shape", "species"),
-                    ]),
-                ),
-            ]),
-            &ctx,
-        )
-        .await;
-        plot = from_response::<PlotResponse>(res)?;
-        thread::sleep(time::Duration::from_secs(2));
-        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
-        s = from_response::<StatusResponse>(res)?;
-        if s.status != Status::Completed {
-            return Err(GQLError::new("failed to create scatter plot"));
-        }
-
-        eprintln!("create smooth plot");
-        res = respond(
-            create_plot(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("name", "smooth plot"),
-                ("type", "SMOOTH"),
-                (
-                    "args",
-                    &vars_to_json_string(&[
-                        ("x", "sepal_width"),
-                        ("y", "petal_width"),
-                        ("title", "Sepal vs. Petal Width"),
-                        ("color", "species"),
-                        ("shape", "species"),
-                    ]),
-                ),
-            ]),
-            &ctx,
-        )
-        .await;
-        plot = from_response::<PlotResponse>(res)?;
-        thread::sleep(time::Duration::from_secs(2));
-        res = respond(status(&[("id", &plot.id.clone())]), &ctx).await;
-        s = from_response::<StatusResponse>(res)?;
-        if s.status != Status::Completed {
-            return Err(GQLError::new("failed to create smooth plot"));
-        }
-
-        eprintln!("rename smooth plot");
-        let new_plot_name = "smooth plot renamed";
-        thread::sleep(time::Duration::from_secs(2));
-        res = respond(
-            rename_plot(&[
-                ("plotId", &plot.id.clone()),
-                ("name", new_plot_name),
-            ]),
-            &ctx,
-        )
-        .await;
-        plot = from_response(res)?;
-        if plot.name != new_plot_name {
-            return Err(GQLError::new("failed to rename plot"));
-        }
-
         eprintln!("create statistic - correlation");
         res = respond(
-            create_statistic(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("type", "CORRELATION"),
-                (
-                    "args",
-                    &vars_to_json_string(&[
-                        ("x", "sepal_width"),
-                        ("y", "petal_width"),
-                    ]),
-                ),
-            ]),
+            create_statistic(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "type": "CORRELATION",
+                "args": r#"{"x": "sepal_width", "y": "petal_width"}"#,
+            })),
             &ctx,
         )
         .await;
         let mut stat = from_response::<StatisticResponse>(res)?;
         thread::sleep(time::Duration::from_secs(1));
-        res = respond(status(&[("id", &stat.id.clone())]), &ctx).await;
+        res = respond(status(&v!({"id": &stat.id.clone()})), &ctx).await;
         s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new(
@@ -536,20 +374,240 @@ mod tests {
 
         eprintln!("create statistic - summary");
         res = respond(
-            create_statistic(&[
-                ("dataviewId", &analysis.dataview.id.clone()),
-                ("type", "SUMMARY"),
-                ("args", &vars_to_json_string(&[("x", "sepal_width")])),
-            ]),
+            create_statistic(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "type": "SUMMARY",
+                "args": r#"{"x": "sepal_width"}"#,
+            })),
             &ctx,
         )
         .await;
         stat = from_response::<StatisticResponse>(res)?;
         thread::sleep(time::Duration::from_secs(1));
-        res = respond(status(&[("id", &stat.id.clone())]), &ctx).await;
+        res = respond(status(&v!({"id": &stat.id.clone()})), &ctx).await;
         s = from_response::<StatusResponse>(res)?;
         if s.status != Status::Completed {
             return Err(GQLError::new("failed to create statistic - summary"));
+        }
+
+        eprintln!("create bar plot");
+        res = respond(
+            create_plot(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "bar",
+                "type": "BAR",
+                "args": r#"{
+                    "x": "species",
+                    "color": "species",
+                    "title": "Species"
+                }"#,
+            })),
+            &ctx,
+        )
+        .await;
+        let mut plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&v!({"id": &plot.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create bar plot"));
+        }
+
+        eprintln!("create histogram plot");
+        res = respond(
+            create_plot(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "histogram",
+                "type": "HISTOGRAM",
+                "args": r#"{"x": "sepal_width"}"#,
+            })),
+            &ctx,
+        )
+        .await;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&v!({"id": &plot.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create histogram plot"));
+        }
+
+        eprintln!("create line plot");
+        res = respond(
+            create_plot(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "histogram",
+                "type": "LINE",
+                "args": r#"{
+                    "x": "sepal_width",
+                    "y": "petal_width",
+                    "title": "Sepal vs. Petal Width",
+                    "color": "species"
+                }"#,
+            })),
+            &ctx,
+        )
+        .await;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&v!({"id": &plot.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create line plot"));
+        }
+
+        eprintln!("create scatter plot");
+        res = respond(
+            create_plot(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "scatter",
+                "type": "SCATTER",
+                "args": r#"{
+                    "x": "sepal_width",
+                    "y": "petal_width",
+                    "title": "Sepal vs. Petal Width",
+                    "color": "species",
+                    "shape": "species"
+                }"#,
+            })),
+            &ctx,
+        )
+        .await;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&v!({"id": &plot.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create scatter plot"));
+        }
+
+        eprintln!("create smooth plot");
+        res = respond(
+            create_plot(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "smooth plot",
+                "type": "SMOOTH",
+                "args": r#"{
+                    "x": "sepal_width",
+                    "y": "petal_width",
+                    "title": "Sepal vs. Petal Width",
+                    "color": "species",
+                    "shape": "species"
+                }"#,
+            })),
+            &ctx,
+        )
+        .await;
+        plot = from_response::<PlotResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(status(&v!({"id": &plot.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to create smooth plot"));
+        }
+
+        eprintln!("rename smooth plot");
+        let new_plot_name = "smooth plot renamed";
+        thread::sleep(time::Duration::from_secs(2));
+        res = respond(
+            rename_plot(&v!({
+                "plotId": &plot.id.clone(),
+                "name": new_plot_name,
+            })),
+            &ctx,
+        )
+        .await;
+        plot = from_response(res)?;
+        if plot.name != new_plot_name {
+            return Err(GQLError::new("failed to rename plot"));
+        }
+
+        eprintln!("model - species classification");
+        res = respond(
+            create_model(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "species classification model",
+                "target": "species",
+                "features": [
+                    "sepal_length",
+                    "sepal_width",
+                    "petal_length",
+                    "petal_width"
+                ],
+            })),
+            &ctx,
+        )
+        .await;
+        let mut model = from_response::<ModelResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(3));
+        res = respond(status(&v!({"id": &model.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to model species"));
+        }
+
+        eprintln!("model - petal_width regression");
+        res = respond(
+            create_model(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "petal_width regression model",
+                "target": "petal_width",
+                "features": [
+                    "sepal_length",
+                    "sepal_width",
+                    "petal_length",
+                    "species"
+                ],
+            })),
+            &ctx,
+        )
+        .await;
+        model = from_response::<ModelResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(3));
+        res = respond(status(&v!({"id": &model.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to model petal_width"));
+        }
+
+        eprintln!("model - cluster");
+        res = respond(
+            create_model(&v!({
+                "dataviewId": &analysis.dataview.id.clone(),
+                "name": "cluster model",
+                "features": [
+                    "sepal_length",
+                    "sepal_width",
+                    "petal_length",
+                    "petal_width"
+                ],
+            })),
+            &ctx,
+        )
+        .await;
+        model = from_response::<ModelResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(3));
+        res = respond(status(&v!({"id": &model.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to cluster"));
+        }
+
+        eprintln!("rename model - species");
+        res = respond(
+            rename_model(&v!({
+                "modelId": &model.id.clone(),
+                "name": "cluster model renamed",
+            })),
+            &ctx,
+        )
+        .await;
+        model = from_response::<ModelResponse>(res)?;
+        thread::sleep(time::Duration::from_secs(1));
+        res = respond(status(&v!({"id": &model.id.clone()})), &ctx).await;
+        s = from_response::<StatusResponse>(res)?;
+        if s.status != Status::Completed {
+            return Err(GQLError::new("failed to rename model - species"));
         }
 
         // eprintln!("delete project");

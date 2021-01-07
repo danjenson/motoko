@@ -80,12 +80,12 @@ class _CreateDialogState extends State<CreateDialog> {
   bool Function() _validate = () => false;
   @override
   Widget build(BuildContext context) {
+    debugPrint(jsonEncode(_fields));
     return CustomDialog(
         title: 'New ${widget.name}',
         content: Column(children: [
           widget.makeForm(
             (fields, validate) => setState(() {
-              debugPrint(jsonEncode(fields));
               _fields = fields;
               _validate = validate;
             }),

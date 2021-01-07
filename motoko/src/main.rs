@@ -171,12 +171,22 @@ fn ensure_clean(path: &str) {
 }
 
 fn build_android_apks() {
-    ensure_on_branch(&["dev", "prod"]);
-    ensure_clean("frontend");
+    // ensure_on_branch(&["dev", "prod"]);
+    // ensure_clean("frontend");
     if is_cloudbuild() {
         setup_android_keystores();
     }
     run_from("frontend", "flutter", &["clean"]);
+    // run_from(
+    //     "frontend",
+    //     "flutter",
+    //     &["build", "apk", &build_tier_flag(), "--debug"],
+    // );
+    // run_from(
+    //     "frontend",
+    //     "flutter",
+    //     &["build", "apk", &build_tier_flag(), "--profile"],
+    // );
     run_from(
         "frontend",
         "flutter",
@@ -191,12 +201,17 @@ fn build_android_apks() {
 }
 
 fn build_tier_flag() -> String {
-    format!("--dart-define=TIER={}", current_branch())
+    let tier = if current_branch() == "prod" {
+        "prod"
+    } else {
+        "dev"
+    };
+    format!("--dart-define=TIER={}", tier)
 }
 
 fn build_android_bundle() {
-    ensure_on_branch(&["dev", "prod"]);
-    ensure_clean("frontend");
+    // ensure_on_branch(&["dev", "prod"]);
+    // ensure_clean("frontend");
     if is_cloudbuild() {
         setup_android_keystores();
     }
@@ -377,7 +392,7 @@ fn deploy_backend() {
 }
 
 fn deploy_android(args: &ArgMatches) {
-    ensure_on_branch(&["dev", "prod"]);
+    // ensure_on_branch(&["dev", "prod"]);
     match args.subcommand() {
         Some(("apk", _)) => deploy_android_apks(),
         Some(("bundle", _)) => deploy_android_bundle(),
@@ -386,7 +401,12 @@ fn deploy_android(args: &ArgMatches) {
 }
 
 fn deploy_android_apks() {
-    ensure_on_branch(&["dev", "prod"]);
+    // ensure_on_branch(&["dev", "prod"]);
+    let tier = if current_branch() == "prod" {
+        "prod"
+    } else {
+        "dev"
+    };
     run_from(
         "frontend",
         "aws",
@@ -394,21 +414,18 @@ fn deploy_android_apks() {
             "s3",
             "cp",
             "build/app/outputs/apk/release/app-arm64-v8a-release.apk",
-            &format!(
-                "s3://motoko-frontend/{}/install/android",
-                current_branch()
-            ),
+            &format!("s3://motoko-frontend/{}/install/android", tier),
         ],
     );
     invalidate_cache();
 }
 
 fn invalidate_cache() {
-    ensure_on_branch(&["dev", "prod"]);
-    let cloudfront_distribution_id = if current_branch() == "dev" {
-        "E1O86QQ54GNZCY"
-    } else {
+    // ensure_on_branch(&["dev", "prod"]);
+    let cloudfront_distribution_id = if current_branch() == "prod" {
         "E2CR4IH7H1BW7N"
+    } else {
+        "E1O86QQ54GNZCY"
     };
 
     run_from(

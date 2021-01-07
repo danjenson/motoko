@@ -683,7 +683,7 @@ impl Mutation {
         name: String,
         target: Option<String>,
         features: Vec<String>,
-        args: GQLJson<Json>,
+        args: Option<GQLJson<Json>>,
     ) -> GQLResult<Model> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
@@ -694,9 +694,32 @@ impl Mutation {
         if role == Role::Viewer {
             return Err(Error::RequiresEditorPermissions.into());
         }
-        Model::create(&d.db, &dataview_uuid, &name, &target, &features, &args)
-            .await
-            .map_err(|e| e.into())
+        let argz = args.map(|v| (*v).clone());
+        let m = Model::create(
+            &d.db,
+            &dataview_uuid,
+            &name,
+            &target,
+            &features,
+            &argz.clone(),
+        )
+        .await
+        .map_err(|e| -> GQLError { e.into() })?;
+        let payload = CreateModelPayload {
+            view: dataview_view_name(&dataview_uuid),
+            uuid: m.uuid.clone(),
+            target: target,
+            features: features,
+            args: argz,
+        };
+        let req = InvocationRequest {
+            function_name: "motoko-model".to_owned(),
+            invocation_type: get_invocation_type(),
+            payload: Some(as_bytes(&payload)?),
+            ..Default::default()
+        };
+        d.lambda.invoke(req).compat().await?;
+        Ok(m)
     }
 
     pub async fn rename_model(

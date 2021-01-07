@@ -7,7 +7,9 @@ CREATE TABLE models (
   target TEXT,
   features TEXT[] NOT NULL,
   args JSON,
-  status STATUS DEFAULT 'queued' NOT NULL
+  status STATUS DEFAULT 'queued' NOT NULL,
+  decisions JSON,
+  evaluation JSON
 );
 CREATE INDEX models_created_at_idx ON models(created_at);
 CREATE INDEX models_updated_at_idx ON models(updated_at);

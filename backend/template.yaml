@@ -71,6 +71,17 @@ Resources:
       CodeUri: py/plot
       Handler: app.lambda_handler
       Runtime: python3.8
+  MotokoModel:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: motoko-model
+      Role: arn:aws:iam::902096072945:role/motoko-lambda
+      MemorySize: 10240
+      CodeUri: py/model
+      Handler: app.lambda_handler
+      Runtime: python3.8
+    Metadata:
+      BuildMethod: makefile
   MotokoInvalidateCache:
     Type: AWS::Serverless::Function
     Properties:

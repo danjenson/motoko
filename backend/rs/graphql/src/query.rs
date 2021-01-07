@@ -186,18 +186,18 @@ impl Query {
         .map_err(|e| e.into())
     }
 
-    async fn plots(
+    async fn statistics(
         &self,
         ctx: &Context<'_>,
         dataview_id: ID,
-    ) -> Result<Vec<Plot>> {
+    ) -> Result<Vec<Statistic>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
         query_as(
             r#"
             SELECT x.*
-            FROM plots x
+            FROM statistics x
             JOIN dataviews dv
             ON x.dataview_uuid = dv.uuid
             AND dv.uuid = $1
@@ -217,18 +217,18 @@ impl Query {
         .map_err(|e| e.into())
     }
 
-    async fn statistics(
+    async fn plots(
         &self,
         ctx: &Context<'_>,
         dataview_id: ID,
-    ) -> Result<Vec<Statistic>> {
+    ) -> Result<Vec<Plot>> {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let dataview_uuid = graphql_id_to_uuid(&dataview_id)?;
         query_as(
             r#"
             SELECT x.*
-            FROM statistics x
+            FROM plots x
             JOIN dataviews dv
             ON x.dataview_uuid = dv.uuid
             AND dv.uuid = $1

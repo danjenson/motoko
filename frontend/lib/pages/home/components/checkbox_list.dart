@@ -15,24 +15,37 @@ class _CheckboxListState extends State<CheckboxList> {
   @override
   Widget build(BuildContext context) {
     var color = Theme.of(context).colorScheme.secondary;
+    final updateParent = () {
+      final selected = Map<String, bool>.from(_checked);
+      selected.removeWhere((v, selected) => !selected);
+      widget.onChanged(selected.keys.toList());
+    };
     if (_checked == null) {
       setState(() {
         _checked =
             Map.fromIterable(widget.items, key: (v) => v, value: (v) => false);
       });
     }
+    if (Set.from(_checked.keys).difference(Set.from(widget.items)).isNotEmpty) {
+      setState(() {
+        _checked.removeWhere((k, v) => !widget.items.contains(k));
+        _selectAll = false;
+      });
+    }
     return Column(children: [
       CheckboxListTile(
-        title: Text('Select all'),
-        contentPadding: EdgeInsets.all(0),
-        activeColor: Theme.of(context).colorScheme.secondary,
-        controlAffinity: ListTileControlAffinity.leading,
-        value: _selectAll,
-        onChanged: (selectAll) => setState(() {
-          _selectAll = selectAll;
-          widget.items.forEach((v) => _checked[v] = selectAll);
-        }),
-      ),
+          title: Text('Select all'),
+          contentPadding: EdgeInsets.all(0),
+          activeColor: Theme.of(context).colorScheme.secondary,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: _selectAll,
+          onChanged: (selectAll) {
+            setState(() {
+              _selectAll = selectAll;
+              widget.items.forEach((v) => _checked[v] = selectAll);
+            });
+            updateParent();
+          }),
       Container(
           constraints: BoxConstraints(maxHeight: 250),
           width: double.maxFinite,
@@ -52,9 +65,7 @@ class _CheckboxListState extends State<CheckboxList> {
                                 _checked[v] = checked;
                                 _selectAll = _checked.values.every((v) => v);
                               });
-                              var selected = Map<String, bool>.from(_checked);
-                              selected.removeWhere((v, selected) => !selected);
-                              widget.onChanged(selected.keys.toList());
+                              updateParent();
                             },
                           ))
                       .toList())))

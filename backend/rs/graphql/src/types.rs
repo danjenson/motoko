@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 pub type Json = serde_json::Value;
 pub type GenericError = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub type Vars<'v> = [(&'v str, &'v str)];
+pub type Vars = async_graphql::Value;
 
 #[derive(Debug, Clone)]
 pub struct Db {
@@ -35,6 +35,15 @@ pub struct CreateDataviewPayload {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct CreateStatisticPayload {
+    pub view: String,
+    pub uuid: Uuid,
+    #[serde(rename = "type")]
+    pub type_: StatisticType,
+    pub args: Json,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct CreatePlotPayload {
     pub view: String,
     pub uuid: Uuid,
@@ -44,12 +53,12 @@ pub struct CreatePlotPayload {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct CreateStatisticPayload {
+pub struct CreateModelPayload {
     pub view: String,
     pub uuid: Uuid,
-    #[serde(rename = "type")]
-    pub type_: StatisticType,
-    pub args: Json,
+    pub target: Option<String>,
+    pub features: Vec<String>,
+    pub args: Option<Json>,
 }
 
 #[derive(

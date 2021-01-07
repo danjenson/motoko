@@ -1,7 +1,7 @@
-from os import environ as env
-from uuid import UUID
 import json
 
+import boto3
+import pandas as pd
 from plotnine import (
     aes,
     ggplot,
@@ -14,74 +14,50 @@ from plotnine import (
     xlab,
     ylab,
 )
-from sqlalchemy import create_engine, text
-import boto3
-import pandas as pd
+from psycopg2 import sql
 
-
-class InvalidArguments(Exception):
-    pass
+import utils as u
 
 
 def lambda_handler(event, context):
-    validate(event)
+    u.validate(event, ['view', 'uuid', 'type', 'args'])
     plot_uuid = event['uuid']
-    data_db, meta_db = dbs()
+    data_db, meta_db = u.dbs()
+    data_cur, meta_cur = data_db.cursor(), meta_db.cursor()
     s3 = boto3.client('s3')
 
     def update_status(status):
-        sql = text('UPDATE plots SET status = :status WHERE uuid = :uuid')
-        res = meta_db.execute(sql, status=status, uuid=plot_uuid)
-        return status if res.rowcount == 1 else 'failed'
+        q = 'UPDATE plots SET status = (%s) WHERE uuid = (%s)'
+        meta_cur.execute(q, (status, str(plot_uuid)))
+        return status
 
     res = 'failed'
     try:
         update_status('running')
         args = json.loads(event['args'])
-        cols = ', '.join(columns(**args))
-        df = pd.read_sql(f"SELECT {cols} FROM {event['view']}", data_db)
+        cols = [sql.Identifier(c) for c in columns(**args)]
+        places = ', '.join(['{}'] * len(cols))
+        view = sql.Identifier(event['view'])
+        q = sql.SQL(f'SELECT {places} FROM {{}}').format(*cols, view)
+        df = pd.read_sql(q, data_db)
         p = plot(df, event['type'], args)
         fname = f'{plot_uuid}.svg'
         tmp_svg = f'/tmp/{fname}'
         p.save(tmp_svg)
-        if run_mode() != 'local':
+        if u.run_mode() != 'local':
             s3.upload_file(tmp_svg, 'motoko-data', f'plots/{fname}')
         res = update_status('completed')
     except Exception as e:
         res = update_status('failed')
         raise e
     finally:
-        meta_db.dispose()
-        data_db.dispose()
+        meta_db.commit()
+        data_db.commit()
+        meta_cur.close()
+        data_cur.close()
+        meta_db.close()
+        data_db.close()
     return {'statusCode': 200, 'body': res}
-
-
-def dbs():
-    docker_db_url = 'postgres://postgres@172.17.0.1:5432/motoko'
-    data_db_url = docker_db_url + '_data'
-    meta_db_url = docker_db_url + '_meta'
-    if run_mode() != 'local':
-        s = boto3.session.Session()
-        sm = s.client(service_name='secretsmanager', region_name='us-west-1')
-        secrets = json.loads(
-            sm.get_secret_value(SecretId='motoko')['SecretString'])
-        data_db_url = secrets['data_db_url']
-        meta_db_url = secrets['meta_db_url']
-    data_db = create_engine(data_db_url)
-    meta_db = create_engine(meta_db_url)
-    return data_db, meta_db
-
-
-def run_mode():
-    return env.get('RUN_MODE', 'local')
-
-
-def validate(event):
-    required = ['view', 'uuid', 'type', 'args']
-    for req in required:
-        if req not in event:
-            raise InvalidArguments(f'no {req}')
-    event['uuid'] = UUID(event['uuid'])
 
 
 def columns(

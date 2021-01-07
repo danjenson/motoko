@@ -1,5 +1,4 @@
-use crate::{GenericError, Json, Vars};
-use async_graphql::Variables;
+use crate::GenericError;
 use bytes::Bytes;
 use rusoto_core::Region;
 use rusoto_credential::AwsCredentials;
@@ -7,7 +6,7 @@ use rusoto_s3::{
     util::PreSignedRequest, util::PreSignedRequestOption, GetObjectRequest,
 };
 use serde::Serialize;
-use std::{collections::BTreeMap, env, str, time::Duration};
+use std::{env, str, time::Duration};
 use uuid::Uuid;
 
 pub fn as_bytes<T: Serialize>(v: &T) -> Result<Bytes, GenericError> {
@@ -55,17 +54,4 @@ pub fn user_name_from_email(email: &str) -> String {
         .first()
         .unwrap()
         .replace(".", "_")
-}
-
-pub fn vars_to_json_string(vars: &Vars) -> String {
-    vars_to_json(vars).to_string()
-}
-
-pub fn vars_to_json(vars: &Vars) -> Json {
-    serde_json::to_value(vars.iter().cloned().collect::<BTreeMap<&str, &str>>())
-        .unwrap()
-}
-
-pub fn vars_to_variables(vars: &Vars) -> Variables {
-    Variables::from_json(vars_to_json(vars))
 }
