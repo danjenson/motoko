@@ -55,7 +55,6 @@ class Content extends StatefulWidget {
       deleteNode(id: \$id)
     }
   ''';
-  void Function() createFunction = () => {};
   @override
   _ContentState createState() => _ContentState();
 }
@@ -192,7 +191,7 @@ class _ContentState extends State<Content> {
                         child: IconButton(
                             onPressed: () async {
                               var closeProgress =
-                                  showProgessDialog('Tidying up...');
+                                  showProgressDialog('Tidying up...');
                               final client = GraphQLProvider.of(context).value;
                               final mutOpts = MutationOptions(
                                 fetchPolicy: FetchPolicy.networkOnly,

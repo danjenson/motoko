@@ -1,13 +1,15 @@
 import '../../../common/accent_color.dart';
 import '../../../common/auth.dart';
+import '../../../common/dialogs.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileDrawer extends StatelessWidget {
-  final double size = 20.0;
+  final double size = 25.0;
   final TextStyle textStyle = TextStyle(fontSize: 20.0);
   final query = '''
     query {
@@ -60,11 +62,27 @@ class ProfileDrawer extends StatelessWidget {
                           color: Theme.of(context).colorScheme.secondary)),
                 ]))),
                 Spacer(),
+                ListTile(
+                    onTap: () async {
+                      const url =
+                          'https://github.com/danjenson/motoko-issues/issues';
+                      if (await canLaunch(url)) {
+                        await launch(url);
+                      } else {
+                        throw 'Could not launch $url';
+                      }
+                    },
+                    leading: Icon(Icons.bug_report_outlined, size: size),
+                    title: Text('Bug Reports & Feature Requests',
+                        style: textStyle)),
                 GestureDetector(
                     child: ListTile(
                         onTap: () {
                           Clipboard.setData(
                               ClipboardData(text: auth.accessToken));
+                          var close =
+                              showProgressDialog('Copied to clipboard', false);
+                          Future.delayed(Duration(milliseconds: 1000), close);
                         },
                         leading: Transform(
                           alignment: Alignment.center,
@@ -79,7 +97,7 @@ class ProfileDrawer extends StatelessWidget {
                   value: !accentColor.isFirst,
                   title: Text('Accent', style: textStyle),
                   onChanged: (value) => accentColor.flip(),
-                  secondary: Icon(Icons.brightness_4),
+                  secondary: Icon(Icons.brightness_4, size: size),
                 ),
                 ListTile(
                     onTap: () => auth.logout(),
