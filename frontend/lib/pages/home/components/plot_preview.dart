@@ -37,8 +37,12 @@ class PlotPreview extends StatelessWidget {
           return result.loading
               ? Center(child: CircularProgressIndicator())
               : GestureDetector(
-                  onLongPress: () =>
-                      Clipboard.setData(ClipboardData(text: uri)),
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: uri));
+                    var close =
+                        showProgressDialog('Copied to clipboard', false);
+                    Future.delayed(Duration(milliseconds: 1000), close);
+                  },
                   child: ClipRect(
                       child: PhotoView.customChild(
                           backgroundDecoration:

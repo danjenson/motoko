@@ -43,13 +43,15 @@ void showSimpleDialog(BuildContext context, String title, String message) {
           ]));
 }
 
-VoidCallback showProgessDialog([message = 'Kicking the tires...']) {
+VoidCallback showProgressDialog(
+    [message = 'Kicking the tires...', showProgressIndicator = true]) {
   showDialog(
       context: globals.homeKey.currentContext,
       child: AlertDialog(
           backgroundColor: Colors.black,
           content: ListTile(
-              leading: CircularProgressIndicator(),
+              leading:
+                  showProgressIndicator ? CircularProgressIndicator() : null,
               title: Text(message,
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 20))),
           contentPadding: EdgeInsets.all(10)));
@@ -100,7 +102,7 @@ class _CreateDialogState extends State<CreateDialog> {
               onPressed: () async {
                 if (_validate()) {
                   Navigator.of(context).pop();
-                  var closeProgress = showProgessDialog();
+                  var closeProgress = showProgressDialog();
                   final client = GraphQLProvider.of(context).value;
                   _fields.removeWhere((k, v) => v == null);
                   final mutOpts = MutationOptions(
