@@ -52,7 +52,7 @@ def statistic_correlation(db, view, x, y, **kwargs):
     q = sql.SQL('SELECT corr({x}, {y}) FROM {view}').format(
         x=sql.Identifier(x), y=sql.Identifier(y), view=sql.Identifier(view))
     db.execute(q)
-    return {'correlation': db.fetchone()[0]}
+    return {'correlation': float(db.fetchone()[0])}
 
 
 def statistic_summary(db, view, x, **kwargs):
@@ -67,7 +67,7 @@ def statistic_summary(db, view, x, **kwargs):
     FROM {view}
     ''').format(x=sql.Identifier(x), view=sql.Identifier(view))
     db.execute(q)
-    res = db.fetchone()
+    res = [float(x) for x in db.fetchone()]
     return {
         'mean': res[0],
         'median': res[1],
