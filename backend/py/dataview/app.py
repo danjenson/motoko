@@ -128,14 +128,14 @@ def dataview_summarize(
             raise InvalidSummarizer(f'invalid summarizer: {summarizer}')
         col = summary['column']
         summarizer = summary['summarizer'].lower()
-        csql = f'{summarizer}({{}}) AS {col}_{summarizer}'
+        csql = f'{summarizer}({{}}) AS "{col}_{summarizer}"'
         if summarizer == 'mean':
-            csql = f'AVG({{}}) AS {col}_mean'
+            csql = f'AVG({{}}) AS "{col}_mean"'
         elif summarizer == 'median':
             csql = 'percentile_cont(0.5) WITHIN GROUP (ORDER BY {})' + \
-                f' AS {col}_median'
+                f' AS "{col}_median"'
         elif summarizer == 'mode':
-            csql = f'mode() WITHIN GROUP (ORDER BY {{}}) AS {col}_mode'
+            csql = f'mode() WITHIN GROUP (ORDER BY {{}}) AS "{col}_mode"'
         clauses.append(sql.SQL(csql).format(sql.Identifier(col)))
     summary_places = ', '.join(['{}'] * len(clauses))
     q = sql.SQL(f'''
