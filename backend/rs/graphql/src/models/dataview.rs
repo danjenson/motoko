@@ -186,7 +186,7 @@ impl Dataview {
         query_scalar::<_, Json>(&format!(
             r#"
             SELECT JSON_AGG(t)
-            FROM (SELECT * FROM {} LIMIT 100) t
+            FROM (SELECT * FROM {} LIMIT 25) t
             "#,
             &view
         ))

@@ -159,7 +159,7 @@ impl Dataset {
         query_scalar::<_, Json>(&format!(
             r#"
             SELECT JSON_AGG(t)
-            FROM (SELECT * FROM {} TABLESAMPLE SYSTEM_ROWS(100)) t
+            FROM (SELECT * FROM {} TABLESAMPLE SYSTEM_ROWS(25)) t
             "#,
             &table_name
         ))
