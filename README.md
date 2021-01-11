@@ -6,7 +6,6 @@
 - iOS deployment
   - test flight
   - apple login
-  - motoko-garbage-collect from cli
 - plotting:
   - custom theme
   - log transforms
