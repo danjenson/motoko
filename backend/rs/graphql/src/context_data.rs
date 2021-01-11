@@ -18,7 +18,18 @@ pub struct ContextData {
 pub struct Auth {
     pub aws_credentials: AwsCredentials,
     pub jwt_secret: String,
-    pub google_oauth2_client_id: String,
+    pub client_ids: OAuth2ClientIds,
+}
+
+#[derive(Debug, Clone)]
+pub struct OAuth2ClientIds {
+    pub google: GoogleOAuthClientIds,
+}
+
+#[derive(Debug, Clone)]
+pub struct GoogleOAuthClientIds {
+    pub android: String,
+    pub ios: String,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +61,12 @@ impl ContextData {
             .connect(&secrets.data_db_url)
             .compat()
             .await?;
+        let client_ids = OAuth2ClientIds {
+            google: GoogleOAuthClientIds {
+                android: secrets.google_oauth2_client_id_android,
+                ios: secrets.google_oauth2_client_id_ios,
+            },
+        };
         Ok(Self {
             user: None,
             db: Db {
@@ -64,9 +81,7 @@ impl ContextData {
                     None,
                 ),
                 jwt_secret: secrets.jwt_secret.clone(),
-                google_oauth2_client_id: secrets
-                    .google_oauth2_client_id
-                    .clone(),
+                client_ids,
             },
             lambda,
             storage: Storage {

@@ -37,7 +37,10 @@ impl Mutation {
         let oauth2_user = match provider {
             Provider::Google => {
                 validate_google_id_token(
-                    &d.auth.google_oauth2_client_id,
+                    vec![
+                        &d.auth.client_ids.google.android,
+                        &d.auth.client_ids.google.ios,
+                    ],
                     &token,
                 )
                 .await?

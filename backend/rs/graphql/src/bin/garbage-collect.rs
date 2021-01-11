@@ -62,6 +62,7 @@ async fn garbage_collect(secrets: &Secrets) -> Result<(), GenericError> {
     drop_unreferenced_dataviews(&db).await?;
     delete_expired_refresh_tokens(&db).await?;
     delete_unreferenced_objects(&db, &s3, bucket, "plots").await?;
+    delete_unreferenced_objects(&db, &s3, bucket, "models").await?;
     Ok(())
 }
 

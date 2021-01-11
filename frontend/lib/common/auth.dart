@@ -1,11 +1,13 @@
+import 'dart:convert';
+import 'dialogs.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'storage.dart';
 import 'tier.dart';
-import 'dialogs.dart';
 import 'utils.dart';
-import 'package:flutter/foundation.dart';
 
 enum Status { Uninitialized, Authenticated, Authenticating, Unauthenticated }
 
@@ -111,17 +113,29 @@ class Auth extends ChangeNotifier {
     await storage.delete('refreshTokenExpiresAt');
   }
 
-  signInWithGoogle(BuildContext context) async {
+  signInWithApple(BuildContext context) async {
+    _signIn(context, 'APPLE', () async {
+      final apple = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      // TODO(danj): finish
+      debugPrint(jsonEncode(apple));
+      return 'credential';
+    });
+  }
+
+  _signIn(BuildContext context, String provider,
+      Future<String> Function() getToken) async {
     try {
       _status = Status.Authenticating;
       notifyListeners();
-      final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
       final mutationOpts = MutationOptions(
           fetchPolicy: FetchPolicy.networkOnly,
           documentNode: gql(_login),
-          variables: {'provider': 'GOOGLE', 'token': googleAuth.idToken});
+          variables: {'provider': provider, 'token': await getToken()});
       final res = await client().mutate(mutationOpts);
       if (!res.loading) {
         debugPrint(res.exception.toString());
@@ -150,6 +164,15 @@ class Auth extends ChangeNotifier {
       _status = Status.Unauthenticated;
       notifyListeners();
     }
+  }
+
+  signInWithGoogle(BuildContext context) async {
+    _signIn(context, 'GOOGLE', () async {
+      final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      return googleAuth.idToken;
+    });
   }
 
   logout() async {

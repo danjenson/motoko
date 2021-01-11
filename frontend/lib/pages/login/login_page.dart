@@ -21,6 +21,11 @@ class LoginPage extends StatelessWidget {
               SizedBox(height: 50),
               Transform.scale(
                   scale: 1.15,
+                  child: SignInButton(Buttons.Apple,
+                      onPressed: () => auth.signInWithApple(context))),
+              SizedBox(height: 5),
+              Transform.scale(
+                  scale: 1.15,
                   child: SignInButton(Buttons.Google,
                       onPressed: () => auth.signInWithGoogle(context))),
             ])));

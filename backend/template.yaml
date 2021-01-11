@@ -80,8 +80,6 @@ Resources:
       CodeUri: py/model
       Handler: app.lambda_handler
       Runtime: python3.8
-    Metadata:
-      BuildMethod: makefile
   MotokoInvalidateCache:
     Type: AWS::Serverless::Function
     Properties:

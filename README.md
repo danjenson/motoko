@@ -3,22 +3,16 @@
 > I'll have my AI analyze the data.
 
 ## TODO
-- model:
-  - backend
-  - frontend
-- feedback from drawer
-  - bug reports
-  - feature requests
 - iOS deployment
-  - developer account
-  - apple login
   - test flight
+  - apple login
+  - motoko-garbage-collect from cli
 - plotting:
   - custom theme
   - log transforms
 - UI:
   - renaming - create `rename_node` mutation
-  - dropdown menu borders
+  - dropdown menus
 - copy references from parents if possible:
   - reverse dependency -> dataviews point to assets, add gc cleanup of assets
     - search in parents? can get complex
@@ -27,20 +21,21 @@
   - statistics
   - models
 - errors:
+  - add errors in stats, plots, functions
   - custom errors from lambda or API gateway if it doesn't even load
   - separate error messages for dev vs prod:
     - https://doc.rust-lang.org/reference/conditional-compilation.html
     - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
 - dev ops:
-  - setup iOS deployment - test flight
   - create test databases for cloudbuild unittests
   - dev tier adds to event object, enabling features
   - setup [RDS Proxy](https://aws.amazon.com/blogs/compute/using-amazon-rds-proxy-with-aws-lambda/)
   - get rights to Motoko font for mobile apps too
 - auth:
   - google auth submit for review
-  - add apple login
+  - apple submit for review
 - bugs:
+  - form builder typeahead: https://github.com/danvick/flutter_form_builder/issues/674
   - fix sliding up panel: https://github.com/akshathjain/sliding_up_panel/issues/193
     - fix hack for preview, adding 140 bottom pixels
   - async SAM invoke: https://github.com/aws/aws-sam-cli/pull/749
@@ -60,7 +55,11 @@
   - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
   - `./install_motoko_command`
 - lambdas:
-  - `sudo pacman -S musl # required to compile rust lambdas`
+  - macOS:
+    - `brew install filosottile/musl-cross/musl-cross`
+    - `ln -s /usr/local/bin/x86_64-linux-musl-gcc /usr/local/bin/musl-gcc`
+  - arch:
+    - `sudo pacman -S musl # required to compile rust lambdas`
 - AWS:
   - `motoko install aws`
   - `aws configure`
@@ -74,32 +73,47 @@
 - flutter:
   - `motoko run setup-android-keystore`
   - `motoko install flutter`
-  - `android-studio # install SDKs`
-    - install command line tools
-    - install dart and flutter plugins
-    - `flutter doctor`
-      - `flutter config --android-studio-dir /opt/android-studio`
+  - android
+    - `android-studio # install SDKs`
+      - install command line tools
+      - install dart and flutter plugins
+      - `flutter doctor`
+        - `flutter config --android-studio-dir /opt/android-studio`
+  - iOS
+    - install XCode
 - add [sqlx cli](https://github.com/launchbadge/sqlx/tree/master/sqlx-cli):
   - `cargo install --version=0.2.0 sqlx-cli --no-default-features --features postgres`
 - postgres:
-  - `pacman -S postgresql`
-  - `sudo -iu postgres`
-  - `initdb -D /var/lib/postgres/data`
-  - enable connections from Docker using AWS SAM:
-    - `vim /var/lib/postgres/data/postgresql.conf`
-      - `listen_addresses = '*'`
-    - `vim /var/lib/postgres/data/pg_hba.conf`
-      - `host	all	all	172.17.0.1/16	trust`
-  - `systemctl enable postgresql`
-  - `systemctl start postgresql`
-  - `psql -U postgres` or `backend/rs/graphql/connect_to_db.sh`
+  - macOS:
+    - `brew install postgres`
+    - enable connections from Docker using AWS SAM:
+      - `vim /usr/local/var/postgres/postgresql.conf`
+        - `listen_addresses = '*'`
+        - `port = 5432`
+      - `vim /usr/local/var/postgres/pg_hba.conf`
+        - `host	all	all	172.17.0.1/16	trust`
+    - `psql -d postgres`
+    - `CREATE USER postgres SUPERUSER`
+    - `pg_ctl restart -D /usr/local/var/postgres`
+    - `brew services postgres start`
+  - arch:
+    - `pacman -S postgresql`
+    - `sudo -iu postgres`
+    - `initdb -D /var/lib/postgres/data`
+    - enable connections from Docker using AWS SAM:
+      - `vim /var/lib/postgres/data/postgresql.conf`
+        - `listen_addresses = '*'`
+      - `vim /var/lib/postgres/data/pg_hba.conf`
+        - `host	all	all	172.17.0.1/16	trust`
+    - `systemctl enable postgresql`
+    - `systemctl start postgresql`
+    - `psql -U postgres` or `backend/rs/graphql/connect_to_db.sh`
   - `CREATE USER motoko WITH PASSWORD '<password>'  # check .env file`
-  - `CREATE DATABASE motoko`
-  - `GRANT ALL PRIVILEGES ON DATABASE motoko TO motoko;`
   - `CREATE DATABASE motoko_data`
+  - `CREATE DATABASE motoko_meta`
   - `GRANT ALL PRIVILEGES ON DATABASE motoko_data TO motoko;`
-  - `CREATE EXTENSION IF NOT EXISTS tsm_system_rows;`
-  - `motoko run reset-databases`
+  - `GRANT ALL PRIVILEGES ON DATABASE motoko_meta TO motoko;`
+  - `motoko run reset-databases (local|remote)`
 - run AWS SAM from `motoko/backend`:
   - `sam local start-lambda`
     - if you get `[Errno 28] No space left on device`, you need to increase
@@ -221,6 +235,10 @@
             policy](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1&tab=permissions)
 
 __GOTCHAS__:
+- when using `sam build` on macOS, be careful about installing binaries; see
+  `backend/py/model/Makefile`, which installs `psycopg2_binary` separately from
+  the rest of the dependencies so it can specify a platform version
+- use `docker run -it --rm busybox` to debug networking from a docker container
 - Integration Requests from API Gateway to Lambda Functions must have Proxy
   enabled.
 - CloudFront Forwarding should have TTL set to 0 under `Behaviors` for requests

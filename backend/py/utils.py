@@ -14,10 +14,20 @@ def dbs():
 
 
 def db_urls():
-    docker_db_url = 'postgres://postgres@172.17.0.1:5432/motoko'
-    data_db_url = docker_db_url + '_data'
-    meta_db_url = docker_db_url + '_meta'
-    if run_mode() != 'local':
+    if run_mode() == 'local':
+        ip = '172.17.0.1'
+        ext = 'data'
+        docker_db_url = 'postgres://postgres@{ip}:5432/motoko_{ext}'
+        # hack to check if host is linux or macos
+        try:
+            db = psycopg2.connect(docker_db_url.format(ip=ip, ext=ext),
+                                  connect_timeout=2)
+            db.close()
+        except Exception:
+            ip = 'host.docker.internal'
+        data_db_url = docker_db_url.format(ip=ip, ext=ext)
+        meta_db_url = docker_db_url.format(ip=ip, ext='meta')
+    else:
         s = boto3.session.Session()
         sm = s.client(service_name='secretsmanager', region_name='us-west-1')
         secrets = json.loads(

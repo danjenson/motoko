@@ -3,7 +3,8 @@ import pandas as pd
 
 class Remover:
     '''Removes records with null values.'''
-    def fit(self, df, metadata):
+    def fit(self, df, target):
+        self.target = target
         '''Fit does nothing here but adheres to the fit-transform API.'''
         # NOTE: don't fit anything here because transform could be
         # called on training or testing data, and you don't want to remove
@@ -13,7 +14,9 @@ class Remover:
     def transform(self, df):
         '''Removes unique and >= 50% null features and records with nulls.'''
         decisions = []
-        unique_features = list(df.columns[df.nunique() == 1])
+        unique_features = [
+            v for v in df.columns[df.nunique() == 1] if v != self.target
+        ]
         if unique_features:
             df = df.drop(unique_features, axis=1)
             decisions.append({
@@ -24,7 +27,9 @@ class Remover:
                 },
             })
         na_rates = df.isnull().sum() / df.shape[0]
-        bad_features = list(na_rates.index[na_rates > 0.5])
+        bad_features = [
+            v for v in na_rates.index[na_rates > 0.5] if v != self.target
+        ]
         if bad_features:
             df = df.drop(bad_features, axis=1)
             decisions.append({

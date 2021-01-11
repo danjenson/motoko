@@ -10,8 +10,8 @@ class Current extends ChangeNotifier {
   final List<String> names;
   final List<bool> _buttons;
 
-  bool get isEmpty {
-    return _stack.isEmpty;
+  bool get canGoBack {
+    return _stack.length > 1;
   }
 
   Widget get content {

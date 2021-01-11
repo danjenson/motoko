@@ -19,17 +19,23 @@ class PreviewPanel extends StatelessWidget {
             topLeft: Radius.circular(10), topRight: Radius.circular(10)),
         border: Border.all(color: color.withOpacity(0.65)),
         body: main,
-        panel: Container(
-            padding: EdgeInsets.all(10),
-            child: Column(
-              children: <Widget>[
-                Container(
-                    height: 3.0,
-                    width: 80,
-                    color: Theme.of(context).colorScheme.secondary),
-                SizedBox(height: 20),
-                preview,
-              ],
-            )));
+        panel: GestureDetector(
+            onTap: () {
+              if (controller.isPanelOpen) {
+                controller.animatePanelToPosition(0.0);
+              } else if (controller.isPanelClosed) {
+                controller.animatePanelToPosition(1.0);
+              }
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+                padding: EdgeInsets.all(10),
+                child: Column(
+                  children: <Widget>[
+                    Container(height: 3.0, width: 80, color: color),
+                    SizedBox(height: 20),
+                    preview,
+                  ],
+                ))));
   }
 }

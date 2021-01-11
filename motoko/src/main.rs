@@ -1,12 +1,17 @@
 use clap::{load_yaml, App, ArgMatches};
+use glob::glob;
+use rusoto_core::Region;
+use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
 use std::{
     env,
-    fs::{create_dir_all, read_dir, remove_file, File},
+    fs::{create_dir_all, read_dir, remove_dir_all, remove_file, File},
     io::Write,
     os::unix::fs::symlink,
     path::Path,
     process::{exit, Command, ExitStatus, Stdio},
 };
+use tokio::runtime::Runtime;
+use tokio_compat_02::FutureExt;
 use which::which;
 
 fn main() {
@@ -159,6 +164,16 @@ fn build_android(args: &ArgMatches) {
 
 fn build_backend() {
     run_from("backend", "sam", &["build"]);
+    let dirs_to_remove = ["tests", "distutils", "_examples", "__pycache__"];
+    for dir in dirs_to_remove.iter() {
+        let pattern = format!("backend/.aws-sam/**/{}/**", dir);
+        for entry in glob(&pattern).unwrap() {
+            let e = entry.unwrap();
+            if e.is_dir() {
+                remove_dir_all(e).expect("unable to delete directory");
+            }
+        }
+    }
 }
 
 fn ensure_clean(path: &str) {
@@ -177,16 +192,6 @@ fn build_android_apks() {
         setup_android_keystores();
     }
     run_from("frontend", "flutter", &["clean"]);
-    // run_from(
-    //     "frontend",
-    //     "flutter",
-    //     &["build", "apk", &build_tier_flag(), "--debug"],
-    // );
-    // run_from(
-    //     "frontend",
-    //     "flutter",
-    //     &["build", "apk", &build_tier_flag(), "--profile"],
-    // );
     run_from(
         "frontend",
         "flutter",
@@ -647,6 +652,7 @@ fn run(args: &ArgMatches) {
     match args.subcommand() {
         Some(("frontend", args)) => run_frontend(args),
         Some(("graphql", args)) => graphql(args),
+        Some(("garbage-collect", _)) => garbage_collect(),
         Some(("invalidate-cache", _)) => invalidate_cache(),
         Some(("reset-android-keystores", _)) => reset_android_keystores(),
         Some(("reset-databases", args)) => reset_databases(args),
@@ -729,6 +735,25 @@ fn _gql(endpoint: &str, args: &ArgMatches) {
         }
         _ => quit("must provide a JSON payload"),
     }
+}
+
+fn garbage_collect() {
+    let lambda = lambda_client();
+    let lambda_req = InvocationRequest {
+        function_name: "motoko-garbage-collect".to_owned(),
+        ..Default::default()
+    };
+    Runtime::new().unwrap().block_on(async {
+        lambda
+            .invoke(lambda_req)
+            .compat()
+            .await
+            .expect("unable to garbage collect!");
+    });
+}
+
+fn lambda_client() -> LambdaClient {
+    LambdaClient::new(Region::UsWest1)
 }
 
 fn reset_android_keystores() {

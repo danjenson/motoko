@@ -55,6 +55,8 @@ class Content extends StatefulWidget {
       deleteNode(id: \$id)
     }
   ''';
+  final int minRefetchDelaySeconds = 2;
+  final int maxRefetchDelaySeconds = 20;
   @override
   _ContentState createState() => _ContentState();
 }
@@ -62,6 +64,7 @@ class Content extends StatefulWidget {
 class _ContentState extends State<Content> {
   final _panelController = PanelController();
   String _selectedId;
+  int _refetchDelaySeconds = 2;
   @override
   Widget build(BuildContext context) {
     final current = Provider.of<Current>(context, listen: false);
@@ -218,7 +221,20 @@ class _ContentState extends State<Content> {
           }).toList();
 
           if (shouldRefetch && result.source == QueryResultSource.Network) {
-            Future.delayed(Duration(milliseconds: 3000), refetch);
+            Future.delayed(Duration(milliseconds: _refetchDelaySeconds * 1000),
+                () {
+              // refetch every [min]->3->5->10->[max] seconds
+              _refetchDelaySeconds = {
+                    2: 3,
+                    3: 5,
+                    5: 10,
+                    10: widget.maxRefetchDelaySeconds
+                  }[_refetchDelaySeconds] ??
+                  widget.maxRefetchDelaySeconds;
+              refetch();
+            });
+          } else {
+            _refetchDelaySeconds = widget.minRefetchDelaySeconds;
           }
 
           String searchableText(dynamic v) {
@@ -244,7 +260,7 @@ class _ContentState extends State<Content> {
                     items: items,
                     searchableText: searchableText,
                     loading: result.loading,
-                    bottomPadding: 140),
+                    bottomPadding: 150),
                 preview: Expanded(
                     child: _selectedId == null
                         ? Center(

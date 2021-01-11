@@ -122,7 +122,7 @@ pub fn user_uuid_from_token(token: &str, jwt_secret: &str) -> GQLResult<Uuid> {
 
 // https://developers.google.com/identity/protocols/oauth2/openid-connect#validatinganidtoken
 pub async fn validate_google_id_token(
-    google_oauth2_client_id: &str,
+    client_ids: Vec<&String>,
     token: &str,
 ) -> GQLResult<OAuth2User> {
     // hitting the tokeninfo endpoint will decrypt the token if it is signed
@@ -145,7 +145,7 @@ pub async fn validate_google_id_token(
         return Err(Error::InvalidIDToken("invalid issuer".into()).into());
     }
     // verify that the OAuth2 client ID is correct
-    if decoded_token.aud != google_oauth2_client_id {
+    if !client_ids.contains(&&decoded_token.aud) {
         return Err(
             Error::InvalidIDToken("incorrect OAuth2 Client ID".into()).into()
         );

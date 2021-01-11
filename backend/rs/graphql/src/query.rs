@@ -5,9 +5,9 @@ use crate::{
         Analysis, Dataset, Dataview, Model, Plot, Project, ProjectUserRole,
         Statistic, User,
     },
-    Node,
+    Error, Node,
 };
-use async_graphql::{Context, Result, ID};
+use async_graphql::{Context, Error as GQLError, Result, ID};
 use sqlx::query_as;
 
 pub struct Query;
@@ -111,19 +111,14 @@ impl Query {
         let d = data(ctx)?;
         let user = current_user(ctx)?;
         let project_uuid = graphql_id_to_uuid(&project_id)?;
-        query_as(
-            r#"
-            SELECT *
-            FROM project_user_roles
-            WHERE user_uuid = $1
-            AND project_uuid = $2
-            "#,
-        )
-        .bind(&user.uuid)
-        .bind(&project_uuid)
-        .fetch_all(&d.db.meta)
-        .await
-        .map_err(|e| e.into())
+        ProjectUserRole::get(&d.db, &project_uuid, &user.uuid)
+            .await
+            .map_err(|_| -> GQLError { Error::InvalidPermissions.into() })?;
+        query_as("SELECT * FROM project_user_roles WHERE project_uuid = $1 ")
+            .bind(&project_uuid)
+            .fetch_all(&d.db.meta)
+            .await
+            .map_err(|e| e.into())
     }
 
     async fn dataviews(

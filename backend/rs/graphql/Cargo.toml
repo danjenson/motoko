@@ -7,28 +7,28 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-graphql = "2.2.0"
+async-graphql = "2.4.6"
 base64 = "0.13.0"
-bytes = "0.5.6"
+bytes = "1.0.0"
 chrono = { version = "0.4.19", features = ["serde"] }
 jsonwebtoken = "7.2.0"
 lambda_http = { version = "0.2.0-beta.1", git = "https://github.com/awslabs/aws-lambda-rust-runtime" }
 lazy_static = "1.4.0"
 node_derive = { path = "node_derive" }
-regex = "1.4.2"
-reqwest = { version = "0.10.9", default-features=false, features = ["json", "rustls-tls"] }
-rusoto_core = { version = "0.45.0", default-features=false, features=["rustls"] }
-rusoto_credential = "0.45.0"
-rusoto_lambda = { version = "0.45.0", default-features=false, features=["rustls"] }
-rusoto_s3 = { version = "0.45.0", default-features=false, features=["rustls"] }
-rusoto_secretsmanager = { version = "0.45.0", default-features=false, features=["rustls"] }
-serde = "1.0.117"
-serde_json = "1.0.59"
-sqlx = { version = "0.4.1", features = ["runtime-tokio-rustls", "json", "postgres", "uuid", "chrono", "macros", "offline"] }
-thiserror = "1.0.22"
-tokio = { version = "0.3.4", features = ["full"] }
-tokio-compat-02 = "0.1.2"
+regex = "1.4.3"
+reqwest = { version = "0.11.0", default-features = false, features = ["json", "rustls-tls"] }
+rusoto_core = { version = "0.46.0", default-features = false, features = ["rustls"] }
+rusoto_credential = "0.46.0"
+rusoto_lambda = { version = "0.46.0", default-features = false, features = ["rustls"] }
+rusoto_s3 = { version = "0.46.0", default-features = false, features = ["rustls"] }
+rusoto_secretsmanager = { version = "0.46.0", default-features = false, features = ["rustls"] }
+serde = "1.0.118"
+serde_json = "1.0.61"
+sqlx = { version = "0.4.2", features = ["runtime-tokio-rustls", "json", "postgres", "uuid", "chrono", "macros", "offline"] }
+thiserror = "1.0.23"
+tokio = { version = "1.0.1", features = ["full"] }
+tokio-compat-02 = "0.2.0"
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
-anyhow = "1.0.34"
+anyhow = "1.0.37"

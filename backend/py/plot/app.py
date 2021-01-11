@@ -4,6 +4,7 @@ import boto3
 import pandas as pd
 from plotnine import (
     aes,
+    element_text,
     ggplot,
     ggtitle,
     geom_bar,
@@ -11,6 +12,7 @@ from plotnine import (
     geom_line,
     geom_point,
     geom_smooth,
+    theme,
     xlab,
     ylab,
 )
@@ -83,7 +85,8 @@ def plot_bar(df, x, color=None, **kwargs):
     a = aesthetics(locals())
     if a.get('color'):
         a['fill'] = a.pop('color')
-    p = ggplot(df, aes(**a)) + geom_bar()
+    p = ggplot(df, aes(**a)) + geom_bar() + theme(
+        axis_text_x=element_text(rotation=90, hjust=1))
     return add_shared(p, **kwargs)
 
 

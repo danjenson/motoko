@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.secondary;
     return MultiProvider(
         providers: [
           ChangeNotifierProvider<Current>(
@@ -25,6 +26,12 @@ class HomePage extends StatelessWidget {
             child: Scaffold(
                 key: globals.homeKey,
                 appBar: AppBar(
+                  leading: Visibility(
+                      visible: current.canGoBack,
+                      child: IconButton(
+                          icon: Icon(Icons.arrow_back_ios),
+                          color: color,
+                          onPressed: () => current.back())),
                   centerTitle: true,
                   title: RichText(
                       text: TextSpan(
@@ -32,7 +39,7 @@ class HomePage extends StatelessWidget {
                           recognizer: TapGestureRecognizer()
                             ..onTap = () => current.to(0),
                           style: TextStyle(
-                              color: Theme.of(context).colorScheme.secondary,
+                              color: color,
                               fontFamily: 'Brushstrike-TTF',
                               fontSize: 35.0))),
                 ),
@@ -43,7 +50,7 @@ class HomePage extends StatelessWidget {
                       FocusScope.of(context).requestFocus(new FocusNode());
                     },
                     child: current.content),
-                drawer: ProfileDrawer(),
+                endDrawer: ProfileDrawer(),
                 bottomNavigationBar: ContentBreadcrumb(),
                 floatingActionButton: Visibility(
                     visible: current.hasCreateButton,

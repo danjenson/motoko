@@ -124,6 +124,8 @@ subcommands:
                                   - payload:
                                       about: JSON payload
                                       required: true
+            - garbage-collect:
+                about: run lambda function motoko-garbage-collect
             - invalidate-cache:
                 about: invalidate CloudFront distribution cache
             - reset-android-keystores:
