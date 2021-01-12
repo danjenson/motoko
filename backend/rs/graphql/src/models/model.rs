@@ -24,6 +24,7 @@ pub struct Model {
     pub status: Status,
     pub evaluation: Option<Json>,
     pub decisions: Option<Json>,
+    pub error: Option<Json>,
 }
 
 impl Model {
@@ -154,5 +155,9 @@ impl Model {
 
     pub async fn decisions(&self) -> Option<GQLJson<Json>> {
         self.decisions.to_owned().map(|v| GQLJson(v))
+    }
+
+    pub async fn error(&self) -> Option<GQLJson<Json>> {
+        self.error.to_owned().map(|v| GQLJson(v))
     }
 }

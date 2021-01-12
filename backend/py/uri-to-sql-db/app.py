@@ -8,7 +8,7 @@ import utils as u
 
 def lambda_handler(event, context):
     u.validate(event, ['uri', 'uuid'])
-    uri, uuid = event['uri'], event['uuid']
+    uri, dataset_uuid = event['uri'], event['uuid']
     if 'drive.google' in uri:
         file_id = uri.split('/')[-2]
         uri = 'https://drive.google.com/uc?export=download&id=' + file_id
@@ -16,18 +16,24 @@ def lambda_handler(event, context):
 
     def update_status(status):
         q = text('UPDATE datasets SET status = :status WHERE uuid = :uuid')
-        res = meta_db.execute(q, status=status, uuid=uuid)
+        res = meta_db.execute(q, status=status, uuid=dataset_uuid)
         return status if res.rowcount == 1 else 'failed'
 
     res = 'failed'
     try:
         update_status('running')
         df = pd.read_csv(uri, low_memory=False)
-        table_name = 'dataset_' + str(uuid).replace('-', '_')
+        table_name = 'dataset_' + str(dataset_uuid).replace('-', '_')
         df.to_sql(name=table_name, con=data_db, index=False)
         res = update_status('completed')
     except Exception as e:
-        res = update_status('failed')
+        q = text('''
+            UPDATE datasets
+            SET status = 'failed', error = :error
+            WHERE uuid = :uuid
+        ''')
+        error = json.dumps({'message': e.args[0]})
+        meta_db.execute(q, error=error, uuid=dataset_uuid)
         raise e
     finally:
         data_db.dispose()

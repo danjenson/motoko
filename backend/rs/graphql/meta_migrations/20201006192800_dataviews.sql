@@ -15,7 +15,8 @@ CREATE TABLE dataviews (
   parent_uuid UUID NOT NULL REFERENCES dataviews(uuid) ON DELETE CASCADE,
   operation DATAVIEW_OPERATION DEFAULT 'create' NOT NULL,
   args JSON,
-  status STATUS DEFAULT 'queued' NOT NULL
+  status STATUS DEFAULT 'queued' NOT NULL,
+  error JSON
 );
 CREATE INDEX dataviews_created_at_idx ON dataviews(created_at);
 CREATE INDEX dataviews_updated_at_idx ON dataviews(updated_at);

@@ -157,17 +157,21 @@ impl Plot {
         &self.status
     }
 
-    pub async fn uri(&self, ctx: &Context<'_>) -> GQLResult<String> {
+    pub async fn uri(&self, ctx: &Context<'_>) -> Option<String> {
         if self.status != Status::Completed {
-            return Err(Error::ResultUnavailable(self.status).into());
+            return None;
         }
         let d = data(ctx)?;
         let key = format!("plots/{}.svg", &self.uuid.to_string());
-        Ok(get_presigned_url(
+        Some(get_presigned_url(
             &d.storage.region,
             &d.storage.bucket,
             &key,
             &d.auth.aws_credentials,
         ))
+    }
+
+    pub async fn error(&self) -> Option<GQLJson<Json>> {
+        self.error.to_owned().map(|v| GQLJson(v))
     }
 }

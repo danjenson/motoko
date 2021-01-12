@@ -29,7 +29,13 @@ def lambda_handler(event, context):
         meta_cur.execute(q, (json.dumps(value), str(statistic_uuid)))
         res = 'completed'
     except Exception as e:
-        res = update_status('failed')
+        q = '''
+            UPDATE statistics
+            SET status = 'failed', error = :error
+            WHERE uuid = :uuid
+        '''
+        error = json.dumps({'message': e.args[0]})
+        meta_cur.execute(q, (error, str(statistic_uuid)))
         raise e
     finally:
         meta_db.commit()

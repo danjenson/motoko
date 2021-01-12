@@ -20,6 +20,7 @@ class Models extends StatelessWidget {
         status
         evaluation
         decisions
+        error
       }
     }
   ''';
@@ -49,6 +50,7 @@ class Models extends StatelessWidget {
         status
         evaluation
         decisions
+        error
       }
     }
   ''';

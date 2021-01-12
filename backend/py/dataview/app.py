@@ -29,7 +29,13 @@ def lambda_handler(event, context):
         )
         update_status('completed')
     except Exception as e:
-        res = update_status('failed')
+        q = '''
+            UPDATE dataviews
+            SET status = 'failed', error = :error
+            WHERE uuid = :uuid
+        '''
+        error = json.dumps({'message': e.args[0]})
+        meta_cur.execute(q, (error, str(dataview_uuid)))
         raise e
     finally:
         meta_db.commit()

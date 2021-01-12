@@ -18,6 +18,7 @@ class Plots extends StatelessWidget {
         type
         args
         status
+        error
       }
     }
   ''';
@@ -42,6 +43,7 @@ class Plots extends StatelessWidget {
         type
         args
         status
+        error
       }
     }
   ''';

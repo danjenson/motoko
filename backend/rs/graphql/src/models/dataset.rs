@@ -21,6 +21,7 @@ pub struct Dataset {
     pub name: String,
     pub uri: String,
     pub status: Status,
+    pub error: Option<Json>,
 }
 
 impl Dataset {
@@ -167,5 +168,9 @@ impl Dataset {
         .await
         .map(|v| GQLJson(v))
         .ok()
+    }
+
+    pub async fn error(&self) -> Option<GQLJson<Json>> {
+        self.error.to_owned().map(|v| GQLJson(v))
     }
 }

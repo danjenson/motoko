@@ -18,6 +18,7 @@ class Statistics extends StatelessWidget {
         args
         status
         value
+        error
       }
     }
   ''';
@@ -39,6 +40,7 @@ class Statistics extends StatelessWidget {
         type
         args
         status
+        error
       }
     }
   ''';

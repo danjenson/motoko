@@ -5,7 +5,8 @@ CREATE TABLE datasets (
   uuid UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   uri TEXT NOT NULL,
-  status STATUS DEFAULT 'queued' NOT NULL
+  status STATUS DEFAULT 'queued' NOT NULL,
+  error JSON
 );
 CREATE INDEX datasets_created_at_idx ON datasets(created_at);
 CREATE INDEX datasets_updated_at_idx ON datasets(updated_at);

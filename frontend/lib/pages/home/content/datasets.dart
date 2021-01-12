@@ -18,6 +18,7 @@ class Datasets extends StatelessWidget {
         name
         status
         nRows
+        error
       }
     }
   ''';
@@ -30,6 +31,7 @@ class Datasets extends StatelessWidget {
         updatedAt
         name
         status
+        error
       }
     }
   ''';

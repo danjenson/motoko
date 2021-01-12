@@ -34,6 +34,7 @@ pub struct Statistic {
     pub args: Json,
     pub status: Status,
     pub value: Option<Json>,
+    pub error: Option<Json>,
 }
 
 impl Statistic {
@@ -134,5 +135,9 @@ impl Statistic {
 
     pub async fn value(&self) -> Option<GQLJson<Json>> {
         self.value.to_owned().map(|v| GQLJson(v))
+    }
+
+    pub async fn error(&self) -> Option<GQLJson<Json>> {
+        self.error.to_owned().map(|v| GQLJson(v))
     }
 }

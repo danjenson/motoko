@@ -50,7 +50,13 @@ def lambda_handler(event, context):
             s3.upload_file(tmp_svg, 'motoko-data', f'plots/{fname}')
         res = update_status('completed')
     except Exception as e:
-        res = update_status('failed')
+        q = '''
+            UPDATE plots
+            SET status = 'failed', error = :error
+            WHERE uuid = :uuid
+        '''
+        error = json.dumps({'message': e.args[0]})
+        meta_cur.execute(q, (error, str(plot_uuid)))
         raise e
     finally:
         meta_db.commit()

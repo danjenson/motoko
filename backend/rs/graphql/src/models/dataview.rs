@@ -39,6 +39,7 @@ pub struct Dataview {
     pub operation: Operation,
     pub args: Option<Json>,
     pub status: Status,
+    pub error: Option<Json>,
 }
 
 impl Dataview {
@@ -194,5 +195,9 @@ impl Dataview {
         .await
         .map(|v| GQLJson(v))
         .ok()
+    }
+
+    pub async fn error(&self) -> Option<GQLJson<Json>> {
+        self.error.to_owned().map(|v| GQLJson(v))
     }
 }

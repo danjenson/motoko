@@ -7,6 +7,11 @@ class Tier extends ChangeNotifier {
     'dev': 'https://dev.motoko.ai/graphql',
     'prod': 'https://motoko.ai/graphql',
   };
+
+  String get tier {
+    return _tier;
+  }
+
   String apiEndpoint() {
     // https://developer.android.com/studio/run/emulator-networking
     // NOTE: use the following for a local server

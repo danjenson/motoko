@@ -4,6 +4,8 @@
 
 ## TODO
 - iOS deployment
+  - errors: check in app for development version.
+    - add errors to dataview, stats, models, plots, uri-to-sql-db
   - read documentation on iOS deployment
   - test flight
   - privacy policy

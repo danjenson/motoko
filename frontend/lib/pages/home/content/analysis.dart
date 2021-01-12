@@ -31,6 +31,7 @@ class Analysis extends StatelessWidget {
         args
         status
         nRows
+        error
       }
     }
   ''';
@@ -52,6 +53,7 @@ class Analysis extends StatelessWidget {
         operation
         args
         status
+        error
       }
     }
   ''';

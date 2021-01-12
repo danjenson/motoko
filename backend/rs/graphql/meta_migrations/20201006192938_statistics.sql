@@ -11,7 +11,8 @@ CREATE TABLE statistics (
   type STATISTIC_TYPE NOT NULL,
   args JSON NOT NULL,
   status STATUS DEFAULT 'queued' NOT NULL,
-  value JSON
+  value JSON,
+  error JSON
 );
 CREATE INDEX statistics_created_at_idx ON statistics(created_at);
 CREATE INDEX statistics_updated_at_idx ON statistics(updated_at);

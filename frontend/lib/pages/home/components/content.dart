@@ -1,8 +1,10 @@
 import '../../../common/dialogs.dart';
+import '../../../common/tier.dart';
 import '../components/current.dart';
 import '../components/globals.dart' as globals;
 import '../components/preview_panel.dart';
 import '../components/searchable_list.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:provider/provider.dart';
@@ -184,14 +186,17 @@ class _ContentState extends State<Content> {
                         child: isError
                             ? IconButton(
                                 onPressed: () {
-                                  var msg = result.exception.toString();
-                                  if (result.exception == null) {
-                                    msg = 'There was an error. Check the'
-                                        ' arguments to this request and ensure'
-                                        ' they make sense with the given'
-                                        ' data.';
+                                  final tier = Provider.of<Tier>(context).tier;
+                                  if (tier == 'prod') {
+                                    final msg = 'There was an error. Check that'
+                                        ' the operation makes sense given the'
+                                        ' provided data.';
+                                    showErrorDialog(context, msg);
+                                  } else {
+                                    final error = jsonDecode(v['error']);
+                                    showErrorDialog(
+                                        context, error['message'].toString());
                                   }
-                                  showErrorDialog(context, msg);
                                 },
                                 icon: Icon(Icons.error, size: 30))
                             : IconButton(
