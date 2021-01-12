@@ -183,8 +183,16 @@ class _ContentState extends State<Content> {
                         visible: isError || inProgress,
                         child: isError
                             ? IconButton(
-                                onPressed: () => showErrorDialog(
-                                    context, result.exception.toString()),
+                                onPressed: () {
+                                  var msg = result.exception.toString();
+                                  if (result.exception == null) {
+                                    msg = 'There was an error. Check the'
+                                        ' arguments to this request and ensure'
+                                        ' they make sense with the given'
+                                        ' data.';
+                                  }
+                                  showErrorDialog(context, msg);
+                                },
                                 icon: Icon(Icons.error, size: 30))
                             : IconButton(
                                 onPressed: () => {},
