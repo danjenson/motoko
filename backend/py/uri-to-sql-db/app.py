@@ -22,7 +22,7 @@ def lambda_handler(event, context):
     res = 'failed'
     try:
         update_status('running')
-        df = pd.read_csv(uri)
+        df = pd.read_csv(uri, low_memory=False)
         table_name = 'dataset_' + str(uuid).replace('-', '_')
         df.to_sql(name=table_name, con=data_db, index=False)
         res = update_status('completed')
