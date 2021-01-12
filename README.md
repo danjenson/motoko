@@ -4,7 +4,9 @@
 
 ## TODO
 - iOS deployment
+  - read documentation on iOS deployment
   - test flight
+  - privacy policy
   - apple login
 - plotting:
   - custom theme
