@@ -50,8 +50,8 @@ def lambda_handler(event, context):
     except Exception as e:
         q = '''
             UPDATE models
-            SET status = 'failed', error = :error
-            WHERE uuid = :uuid
+            SET status = 'failed', error = (%s)
+            WHERE uuid = (%s)
         '''
         error = json.dumps({'message': e.args[0]})
         meta_cur.execute(q, (error, str(model_uuid)))

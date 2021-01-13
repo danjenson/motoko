@@ -4,8 +4,6 @@
 
 ## TODO
 - iOS deployment
-  - errors: check in app for development version.
-    - add errors to dataview, stats, models, plots, uri-to-sql-db
   - read documentation on iOS deployment
   - test flight
   - privacy policy
@@ -24,9 +22,8 @@
   - statistics
   - models
 - errors:
-  - add errors in stats, plots, functions
   - custom errors from lambda or API gateway if it doesn't even load
-  - separate error messages for dev vs prod:
+  - separate error messages for dev vs prod (both app and from console):
     - https://doc.rust-lang.org/reference/conditional-compilation.html
     - https://doc.rust-lang.org/beta/rustc/command-line-arguments.html
 - dev ops:

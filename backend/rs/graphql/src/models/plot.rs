@@ -2,7 +2,7 @@ use crate::{
     gql::data,
     models::{Dataview, Role, Status},
     utils::get_presigned_url,
-    Db, Error,
+    Db,
 };
 use async_graphql::{Context, Enum, Json as GQLJson, Result as GQLResult, ID};
 use chrono::{DateTime, Utc};
@@ -38,6 +38,7 @@ pub struct Plot {
     pub type_: Type,
     pub args: Json,
     pub status: Status,
+    pub error: Option<Json>,
 }
 
 impl Plot {
@@ -161,7 +162,7 @@ impl Plot {
         if self.status != Status::Completed {
             return None;
         }
-        let d = data(ctx)?;
+        let d = data(ctx).ok()?;
         let key = format!("plots/{}.svg", &self.uuid.to_string());
         Some(get_presigned_url(
             &d.storage.region,

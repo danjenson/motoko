@@ -52,8 +52,8 @@ def lambda_handler(event, context):
     except Exception as e:
         q = '''
             UPDATE plots
-            SET status = 'failed', error = :error
-            WHERE uuid = :uuid
+            SET status = 'failed', error = (%s)
+            WHERE uuid = (%s)
         '''
         error = json.dumps({'message': e.args[0]})
         meta_cur.execute(q, (error, str(plot_uuid)))
