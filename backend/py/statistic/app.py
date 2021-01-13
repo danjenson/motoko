@@ -55,7 +55,7 @@ def statistic(_type, db, view, args):
 
 
 def statistic_correlation(db, view, x, y, **kwargs):
-    q = sql.SQL('SELECT corr({x}::float8, {y}::float8) FROM {view}').format(
+    q = sql.SQL('SELECT corr({x}, {y}) FROM {view}').format(
         x=sql.Identifier(x), y=sql.Identifier(y), view=sql.Identifier(view))
     db.execute(q)
     return {'correlation': float(db.fetchone()[0])}
@@ -64,12 +64,12 @@ def statistic_correlation(db, view, x, y, **kwargs):
 def statistic_summary(db, view, x, **kwargs):
     q = sql.SQL('''
     SELECT
-        avg({x}::float8) AS mean,
-        percentile_cont(0.5) WITHIN GROUP (ORDER BY {x}::float8) AS median,
-        mode() WITHIN GROUP (ORDER BY {x}::float8) AS mode,
-        min({x}::float8),
-        max({x}::float8),
-        stddev({x}::float8)
+        avg({x}) AS mean,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY {x}) AS median,
+        mode() WITHIN GROUP (ORDER BY {x}) AS mode,
+        min({x}),
+        max({x}),
+        stddev({x})
     FROM {view}
     ''').format(x=sql.Identifier(x), view=sql.Identifier(view))
     db.execute(q)
