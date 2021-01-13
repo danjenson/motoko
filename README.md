@@ -6,6 +6,7 @@
 - iOS deployment
   - read documentation on iOS deployment
   - test flight
+  - fix summarize - limit for numeric cols
   - privacy policy
   - apple login
 - plotting:
