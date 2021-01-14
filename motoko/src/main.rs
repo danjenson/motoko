@@ -339,9 +339,14 @@ fn lambda_exists(name: &str) -> bool {
 }
 
 fn build_ios() {
-    ensure_on_branch(&["dev", "prod"]);
-    ensure_clean("frontend");
-    quit("building iOS is not yet supported!");
+    // ensure_on_branch(&["dev", "prod"]);
+    // ensure_clean("frontend");
+    run_from("frontend", "flutter", &["clean"]);
+    run_from(
+        "frontend",
+        "flutter",
+        &["build", "ios", &build_tier_flag(), "--release"],
+    );
 }
 
 fn build_sam() {
@@ -586,6 +591,10 @@ fn install(args: &ArgMatches) {
 }
 
 fn install_android() {
+    install_on_attached_device();
+}
+
+fn install_on_attached_device() {
     run_from("frontend", "flutter", &["install"]);
 }
 
@@ -645,7 +654,7 @@ fn install_git_hooks() {
 }
 
 fn install_ios() {
-    quit("installing iOS is not currently supported!");
+    install_on_attached_device();
 }
 
 fn run(args: &ArgMatches) {
