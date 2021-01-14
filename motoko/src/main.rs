@@ -354,8 +354,8 @@ fn build_sam() {
 }
 
 fn build_web() {
-    ensure_on_branch(&["dev", "prod"]);
-    ensure_clean("frontend");
+    // ensure_on_branch(&["dev", "prod"]);
+    // ensure_clean("frontend");
     run_from("frontend", "flutter", &["channel", "beta"]);
     run_from("frontend", "flutter", &["upgrade"]);
     run_from("frontend", "flutter", &["config", "--enable-web"]);
@@ -627,7 +627,7 @@ fn install_flutter() {
             &[
                 "clone",
                 "https://github.com/flutter/flutter.git",
-                "/data/repos/flutter",
+                &format!("{}/repos/flutter", &home_dir()),
                 "-b",
                 "stable",
                 "--depth",
