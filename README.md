@@ -36,6 +36,7 @@
   - google auth submit for review
   - apple submit for review
 - bugs:
+  - form builder: https://github.com/danvick/flutter_form_builder/issues/676
   - form builder typeahead: https://github.com/danvick/flutter_form_builder/issues/674
   - fix sliding up panel: https://github.com/akshathjain/sliding_up_panel/issues/193
     - fix hack for preview, adding 140 bottom pixels
