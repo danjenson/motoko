@@ -9,7 +9,7 @@ if [ "$1" = "connect" ]; then
     --dbname=postgres
 elif [ "$1" = "graph" ]; then
   pip install eralchemy
-  eralchemy -i 'postgres://postgres@localhost/motoko' -o models.pdf
+  eralchemy -i 'postgres://postgres@localhost/motoko_meta' -o meta_models.pdf
 else
   echo "usage: ./db.sh [connect|graph]"
 fi
