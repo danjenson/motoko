@@ -1,11 +1,3 @@
-# (2019-11-27) must install from source to enable grpc.so_reuseport
-grpcio --no-binary grpcio
-grpcio-tools
-mysql-connector-python
-nose
-numpy
-pandas
-protobuf
-pymongo
-scipy
-sklearn
+version https://git-lfs.github.com/spec/v1
+oid sha256:2e5776ffab66dce1a0d2074ef438f3a28767b6ddb5e21723d0fc65f938103c54
+size 179

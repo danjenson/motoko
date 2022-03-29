@@ -1,3 +1,3 @@
-pandas
-plotnine
-psycopg2_binary
+version https://git-lfs.github.com/spec/v1
+oid sha256:22452c41d8468653cdaa9c6b2efc052b324c59f0fd9f575054859b7808020ace
+size 32

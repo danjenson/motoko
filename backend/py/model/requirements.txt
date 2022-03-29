@@ -1,4 +1,3 @@
-numpy
-pandas
-psycopg2_binary
-scikit-learn
+version https://git-lfs.github.com/spec/v1
+oid sha256:b448a16f3c055f376486c727c3122c029e808b1f5718243dc6933d9205cd3e2b
+size 42

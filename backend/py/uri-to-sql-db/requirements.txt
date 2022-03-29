@@ -1,3 +1,3 @@
-pandas
-psycopg2_binary
-sqlalchemy
+version https://git-lfs.github.com/spec/v1
+oid sha256:e5df7c68fb01d8188abee8f15b76411dbf6e5fc53fb85940b9d97c29a48ba97d
+size 34
