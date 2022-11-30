@@ -1,8 +1,53 @@
 # motoko
+
 ![motoko motorcycle](https://i.pinimg.com/originals/56/55/bb/5655bbf38aedf1ff44e926c190859c7b.png)
+
 > I'll have my AI analyze the data.
 
+## Graduate Schools
+
+The following are links to relevant parts of codebase:
+
+- [Modeling](backend/py/plot)
+- [Plotting](backend/py/plot)
+- [Statistics](backend/py/statistic)
+- [API and databases](backend/rs/graphql)
+- [iOS and Android](frontend)
+- [Administration and Deployment](motoko/src/main.rs)
+
+## Overview
+
+Motoko is an app that can plot, model, preview, and analyze datasets from iOS or
+Android.
+
+The frontend is written in Dart using the Flutter framework and can be compiled
+to iOS, Android, Linux, and the Web.
+
+The backend is written in Rust and Python. Rust is used for database management
+and AWS Lambda functions. Python is used for plotting and machine learning
+models.
+
+An AWS RDS database (PostgreSQL) stores all of the data.
+
+Local setup, data models, deployment, authentication and authorization, app
+signing, and network topography are detailed below.
+
+There is a also a binary written in Rust that performs the various
+administrative and deployment commands called `motoko`, which can be installed
+with `./install_motoko_command`.
+
+## Screenshots
+
+<p float="left">
+  <img src="./screenshots/landing.jpg" width="300" />
+  <img src="./screenshots/new_plot.jpg" width="300" /> 
+  <img src="./screenshots/histogram.jpg" width="300" />
+  <img src="./screenshots/statistics.jpg" width="300" />
+  <img src="./screenshots/analyses.jpg" width="300" />
+</p>
+
 ## TODO
+
 - iOS deployment
   - test flight
   - apple login
@@ -44,6 +89,7 @@
   - [truncated text on mobile web](https://github.com/flutter/flutter/issues/63467)
 
 ## Product
+
 - Marketplace for canned analyses?
 - Data adapters?
 - Tools like hedonometer
@@ -51,8 +97,9 @@
 ## Local Setup
 
 #### General
+
 - `motoko` command
-  - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` 
+  - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
   - `./install_motoko_command`
 - lambdas:
   - macOS:
@@ -91,7 +138,7 @@
         - `listen_addresses = '*'`
         - `port = 5432`
       - `vim /usr/local/var/postgres/pg_hba.conf`
-        - `host	all	all	172.17.0.1/16	trust`
+        - `host all all 172.17.0.1/16 trust`
     - `psql -d postgres`
     - `CREATE USER postgres SUPERUSER`
     - `pg_ctl restart -D /usr/local/var/postgres`
@@ -104,11 +151,11 @@
       - `vim /var/lib/postgres/data/postgresql.conf`
         - `listen_addresses = '*'`
       - `vim /var/lib/postgres/data/pg_hba.conf`
-        - `host	all	all	172.17.0.1/16	trust`
+        - `host all all 172.17.0.1/16 trust`
     - `systemctl enable postgresql`
     - `systemctl start postgresql`
     - `psql -U postgres` or `backend/rs/graphql/connect_to_db.sh`
-  - `CREATE USER motoko WITH PASSWORD '<password>'  # check .env file`
+  - `CREATE USER motoko WITH PASSWORD '<password>' # check .env file`
   - `CREATE DATABASE motoko_data`
   - `CREATE DATABASE motoko_meta`
   - `GRANT ALL PRIVILEGES ON DATABASE motoko_data TO motoko;`
@@ -126,7 +173,9 @@
     built in order to be called by other testing scripts
 
 #### [Databases](https://us-west-1.console.aws.amazon.com/rds/home?region=us-west-1#database:id=motoko-free-tier;is-cluster=false)
+
 ##### AWS RDS creation:
+
 - Create new db
   [here](https://us-west-1.console.aws.amazon.com/rds/home?region=us-west-1#)
 - Make sure `public accessibility` option is set to `Yes`
@@ -134,7 +183,9 @@
   like [this](https://us-west-1.console.aws.amazon.com/ec2/v2/home?region=us-west-1#SecurityGroups:search=motoko-free-tier)
 
 #### Simulators
+
 ##### Android
+
 - `motoko run emulator {android,ios,web}`
 - `frontend $ flutter run`
 - if you get `PlatformException...ApiException: 10`, see App Signing section
@@ -145,19 +196,23 @@
   - click Play Store version to update
 
 ## Infrastructure
+
 - Frontend uses [flutter](https://flutter.dev/), which is written in dart, here
   is the [style guide](https://dart.dev/guides/language/effective-dart/style)
 - Backend uses API Gateway and Lambda Functions; most code is written in rust
   or python
 
 ## Data Models
+
 ![model graph](https://github.com/danjenson/motoko/blob/prod/backend/rs/gql/models.pdf)
 
 #### Creating a Migration
+
 - `sqlx migrate add <name> # fill out in migrations/<name>.sql`
 - `cargo sqlx prepare -- --lib # recompile static type checking`
 
 ## Deployment
+
 - automatic deployment for the `dev` and `prod` branches is setup for every
   push using [AWS CodeBuild](https://docs.aws.amazon.com/codebuild/latest/userguide/sample-ecr.html)
   - the [custom build image](https://github.com/danjenson/motoko/blob/prod/build_image/Dockerfile)
@@ -173,38 +228,40 @@
     pipelines provide the progress and logs for builds
 
 ## Authentication and Authorization
+
 - [Google login](https://console.cloud.google.com/apis/credentials?folder=&organizationId=&project=motoko-286819)
 
 ## App Signing
+
 - android requires a keystore to sign the release app:
   - to setup building locally using the release keys, run
     `motoko run setup-android-keystore`, which does the following:
-      - downloads the android keystore to
-        `~/.keys/motoko/android/signing_key.jks`
-      - creates the file `frontend/android/key.properties`, which contains the
-        password to unlock the keystore (also from AWS Secrets Manager) and is
-        used when building by gradle; do not add either of these files to the
-        code repo
+    - downloads the android keystore to
+      `~/.keys/motoko/android/signing_key.jks`
+    - creates the file `frontend/android/key.properties`, which contains the
+      password to unlock the keystore (also from AWS Secrets Manager) and is
+      used when building by gradle; do not add either of these files to the
+      code repo
   - make sure that before installing the version with the new keystore, you
     have uninstalled the old version
-  - to reset the keystore in AWS Secrets Manager, run `motoko run
-    reset-android-keystores`, which does the following:
-      - generates a new keystore and uploads it to AWS Secrets Manager with the
-        key `android_{release,debug}_keystore` along with the password under
-        the key `android_keystore_password`
-      - runs the same commands as `motoko run setup-android-keystores` to setup
-        the local environment to use the new keys
-      - __NOTE__: after a reset, you will need to run `./gradlew signingReport`
-        from the `frontend/android` directory and copy the debug and
-        release SHA1 hashes into the OAuth2 clients configs:
-        [motoko-android-debug](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-d95mopk70t0o0d9gphomcncu3961ge9s.apps.googleusercontent.com?project=motoko-286819)
-        and
-        [motoko-android-release](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-nk7lev14vc27gpa6o30c2o0mc25btmge.apps.googleusercontent.com?project=motoko-286819);
-        this lets google login know that builds using these signatures are
-        legitimate; if the hashes are incorrect, google will reject attempted
-        logins and return a `PlatformException` with error code `10`
+  - to reset the keystore in AWS Secrets Manager, run `motoko run reset-android-keystores`, which does the following:
+    - generates a new keystore and uploads it to AWS Secrets Manager with the
+      key `android_{release,debug}_keystore` along with the password under
+      the key `android_keystore_password`
+    - runs the same commands as `motoko run setup-android-keystores` to setup
+      the local environment to use the new keys
+    - **NOTE**: after a reset, you will need to run `./gradlew signingReport`
+      from the `frontend/android` directory and copy the debug and
+      release SHA1 hashes into the OAuth2 clients configs:
+      [motoko-android-debug](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-d95mopk70t0o0d9gphomcncu3961ge9s.apps.googleusercontent.com?project=motoko-286819)
+      and
+      [motoko-android-release](https://console.cloud.google.com/apis/credentials/oauthclient/714421651437-nk7lev14vc27gpa6o30c2o0mc25btmge.apps.googleusercontent.com?project=motoko-286819);
+      this lets google login know that builds using these signatures are
+      legitimate; if the hashes are incorrect, google will reject attempted
+      logins and return a `PlatformException` with error code `10`
 
 ## Topography
+
 - [Route 53](https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z05536462C01YTPKRNSZ7):
   - NS Records:
     - mapped Nameservers from [Namecheap](https://ap.www.namecheap.com/Domains/DomainControlPanel/motoko.ai/domain/) to Route 53 Nameservers above
@@ -216,8 +273,8 @@
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E2CR4IH7H1BW7N)
         - re-routes traffic from motoko.ai/graphql to the `prod` stage of API
           Gateway's [motoko-api](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/5rr0s7ncpd/resources/cn0wjvae56)
-        - re-routes traffic from motoko.ai/* and motoko.ai/install/* to prod/*
-          and prod/install/* in the
+        - re-routes traffic from motoko.ai/_ and motoko.ai/install/_ to prod/_
+          and prod/install/_ in the
           [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1)
           - allows access by OAI (Origin Access Identity) to CloudFront
             distribution in [bucket
@@ -227,14 +284,15 @@
         distribution](https://console.aws.amazon.com/cloudfront/home#distribution-settings:E1O86QQ54GNZCY)
         - re-routes traffic from dev.motoko.ai/graphql to the `dev` stage of API
           Gateway's [motoko-api](https://us-west-1.console.aws.amazon.com/apigateway/home?region=us-west-1#/apis/5rr0s7ncpd/resources/cn0wjvae56)
-        - re-routes traffic from motoko.ai/* and motoko.ai/install/* to dev/*
-          and dev/install/* in the
+        - re-routes traffic from motoko.ai/_ and motoko.ai/install/_ to dev/_
+          and dev/install/_ in the
           [S3 bucket](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1)
           - allows access by OAI (Origin Access Identity) to CloudFront
             distribution in [bucket
             policy](https://console.aws.amazon.com/s3/buckets/motoko-frontend/?region=us-west-1&tab=permissions)
 
-__GOTCHAS__:
+**GOTCHAS**:
+
 - when using `sam build` on macOS, be careful about installing binaries; see
   `backend/py/model/Makefile`, which installs `psycopg2_binary` separately from
   the rest of the dependencies so it can specify a platform version
