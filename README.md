@@ -8,9 +8,9 @@
 
 The following are links to relevant parts of codebase:
 
-- [Modeling](backend/py/plot)
-- [Plotting](backend/py/plot)
-- [Statistics](backend/py/statistic)
+- [Modeling](backend/py/plot/app.py)
+- [Plotting](backend/py/plot/app.py)
+- [Statistics](backend/py/statistic/app.py)
 - [API and databases](backend/rs/graphql)
 - [iOS and Android](frontend)
 - [Administration and Deployment](motoko/src/main.rs)
