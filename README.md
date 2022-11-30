@@ -8,7 +8,7 @@
 
 The following are links to relevant parts of codebase:
 
-- [Modeling](backend/py/plot/app.py)
+- [Modeling](backend/py/model)
 - [Plotting](backend/py/plot/app.py)
 - [Statistics](backend/py/statistic/app.py)
 - [API and databases](backend/rs/graphql)
